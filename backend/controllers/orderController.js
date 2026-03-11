@@ -4,6 +4,7 @@ import Product from '../models/Product.js';
 import User from '../models/User.js';
 import mongoose from 'mongoose';
 import DeliverySettings from '../models/DeliverySettings.js';
+import { calculateTaxForItems } from '../utils/taxCalculator.js';
 
 // Create order
 export const createOrder = async (req, res) => {
@@ -156,8 +157,8 @@ export const createOrder = async (req, res) => {
       await product.save({ session });
     }
 
-    // Calculate totals
-    const tax = subtotal * 0.1; // 10% tax
+    // Calculate totals using vendor-dynamic tax settings
+    const { tax, taxDisplay } = await calculateTaxForItems(orderItems);
     const shippingCost = await DeliverySettings.calculateShipping(subtotal);
     const total = subtotal + tax + shippingCost;
 
@@ -176,7 +177,7 @@ export const createOrder = async (req, res) => {
       orderType,
       items: orderItems,
       subtotal,
-      tax,
+      tax: taxDisplay,
       shippingCost,
       total,
       paymentMethod,

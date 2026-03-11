@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useCartStore } from '@/stores/cartStore';
+import { useAuthStore } from '@/stores/authStore';
 import { formatCurrency } from '@/lib/utils';
 import api from '@/lib/api';
 import { Trash2, Plus, Minus, ShoppingBag, Truck } from 'lucide-react';
@@ -14,6 +15,7 @@ const getCartItemKey = (item: { product: { _id: string }; selectedVariant?: { co
 
 const Cart: React.FC = () => {
   const { items, removeItem, updateQuantity, getTotalPrice, clearCart } = useCartStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
 
   const { data: deliverySettings } = useQuery({
@@ -31,7 +33,35 @@ const Cart: React.FC = () => {
     if (freeDeliveryThreshold > 0 && subtotal >= freeDeliveryThreshold) return 0;
     return Math.max(minDeliveryFee, subtotal * deliveryFeeRate / 100);
   })();
-  const tax = subtotal * 0.1;
+
+  const { data: taxData, isLoading: taxLoading } = useQuery({
+    queryKey: ['tax-estimate', items.map((i) => `${i.product._id}-${i.quantity}`).join(',')],
+    queryFn: async () => {
+      const res = await api.post<{
+        success: boolean;
+        data: { tax: number; taxDisplay: number; breakdown: { label: string; rate: number; amount: number }[] };
+      }>('/api/payment/tax-estimate', {
+        items: items.map((i) => ({
+          product: i.product._id,
+          quantity: i.quantity,
+          variant: i.selectedVariant,
+        })),
+      });
+      return res.data.data;
+    },
+    enabled: items.length > 0 && !!user,
+    retry: false,
+  });
+
+  const tax = taxData?.tax ?? 0;             // exclusive only – added to total
+  const taxDisplay = taxData?.taxDisplay ?? taxData?.tax ?? 0; // fall back to tax if taxDisplay absent
+  const taxBreakdown = taxData?.breakdown ?? [];
+  const taxLabel =
+    taxBreakdown.length === 1
+      ? `${taxBreakdown[0].label} (${taxBreakdown[0].rate}%)`
+      : taxBreakdown.length > 1
+      ? 'Tax'
+      : 'Tax';
   const total = subtotal + deliveryFee + tax;
 
   if (items.length === 0) {
@@ -182,8 +212,20 @@ const Cart: React.FC = () => {
                 )}
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Tax (10%)</span>
-                <span className="font-medium">{formatCurrency(tax)}</span>
+                <span className="text-gray-600">
+                  {taxLoading ? 'Tax' : taxBreakdown.length === 1 ? `${taxBreakdown[0].label} (${taxBreakdown[0].rate}%)` : 'Tax'}
+                </span>
+                <span className="font-medium">
+                  {!user ? (
+                    <span className="text-xs text-gray-400">at checkout</span>
+                  ) : taxLoading ? (
+                    <span className="inline-block w-16 h-4 bg-gray-200 rounded animate-pulse" />
+                  ) : taxDisplay > 0 ? (
+                    formatCurrency(taxDisplay)
+                  ) : (
+                    <span className="text-gray-400 text-sm">None</span>
+                  )}
+                </span>
               </div>
             </div>
 

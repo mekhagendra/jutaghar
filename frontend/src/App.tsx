@@ -24,6 +24,9 @@ const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
 const VendorDashboard = lazy(() => import('@/pages/vendor/Dashboard'));
 const UserDashboard = lazy(() => import('@/pages/user/Dashboard'));
 const OrderDetail = lazy(() => import('@/pages/user/OrderDetail'));
+const UserOrders = lazy(() => import('@/pages/user/Orders'));
+const UserWishlist = lazy(() => import('@/pages/user/Wishlist'));
+const UserProfile = lazy(() => import('@/pages/user/Profile'));
 
 // Admin pages
 const ManageCategories = lazy(() => import('@/pages/admin/ManageCategories'));
@@ -38,9 +41,12 @@ const NewProduct = lazy(() => import('@/pages/vendor/NewProduct'));
 const EditProduct = lazy(() => import('@/pages/vendor/EditProduct'));
 const ManageProducts = lazy(() => import('@/pages/vendor/ManageProducts'));
 const ManageInventory = lazy(() => import('@/pages/vendor/ManageInventory'));
+const VendorTaxSettings = lazy(() => import('@/pages/vendor/TaxSettings'));
 
 // Layout
 import MainLayout from '@/layouts/MainLayout';
+import DashboardLayout from '@/layouts/dashboard';
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -121,131 +127,57 @@ function App() {
               }
             />
 
-            {/* Admin routes */}
-            <Route
-              path="/admin/dashboard"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/users"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                  <ManageUsers />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/categories"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                  <ManageCategories />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/brands"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                  <ManageBrands />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/products"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                  <AdminManageProducts />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/hero-slides"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                  <ManageHeroSlides />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/delivery-settings"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                  <AdminDeliverySettings />
-                </ProtectedRoute>
-              }
-            />
 
-            {/* Vendor routes */}
-            <Route
-              path="/vendor/dashboard"
-              element={
-                <ProtectedRoute allowedRoles={['manufacturer', 'importer', 'seller', 'outlet', 'admin', 'manager']}>
-                  <VendorDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/products/new"
-              element={
-                <ProtectedRoute allowedRoles={['manufacturer', 'importer', 'seller', 'outlet', 'admin', 'manager']}>
-                  <NewProduct />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/products/manage"
-              element={
-                <ProtectedRoute allowedRoles={['manufacturer', 'importer', 'seller', 'outlet', 'admin', 'manager']}>
-                  <ManageProducts />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/products/:id/edit"
-              element={
-                <ProtectedRoute allowedRoles={['manufacturer', 'importer', 'seller', 'outlet', 'admin', 'manager']}>
-                  <EditProduct />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/inventory/manage"
-              element={
-                <ProtectedRoute allowedRoles={['manufacturer', 'importer', 'seller', 'outlet', 'admin', 'manager']}>
-                  <ManageInventory />
-                </ProtectedRoute>
-              }
-            />
 
-            {/* User routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <UserDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/user/dashboard"
-              element={
-                <ProtectedRoute>
-                  <UserDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/orders/:id"
-              element={
-                <ProtectedRoute>
-                  <OrderDetail />
-                </ProtectedRoute>
-              }
-            />
+          </Route>
+
+          {/* Admin routes */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<ManageUsers />} />
+            <Route path="/admin/categories" element={<ManageCategories />} />
+            <Route path="/admin/brands" element={<ManageBrands />} />
+            <Route path="/admin/products" element={<AdminManageProducts />} />
+            <Route path="/admin/hero-slides" element={<ManageHeroSlides />} />
+            <Route path="/admin/delivery-settings" element={<AdminDeliverySettings />} />
+          </Route>
+
+          {/* Vendor routes */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={['manufacturer', 'importer', 'seller', 'outlet', 'admin', 'manager']}>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/vendor/dashboard" element={<VendorDashboard />} />
+            <Route path="/products/new" element={<NewProduct />} />
+            <Route path="/products/manage" element={<ManageProducts />} />
+            <Route path="/products/:id/edit" element={<EditProduct />} />
+            <Route path="/inventory/manage" element={<ManageInventory />} />
+            <Route path="/vendor/tax" element={<VendorTaxSettings />} />
+          </Route>
+
+          {/* Customer / User routes */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard" element={<UserDashboard />} />
+            <Route path="/user/dashboard" element={<UserDashboard />} />
+            <Route path="/user/orders" element={<UserOrders />} />
+            <Route path="/user/wishlist" element={<UserWishlist />} />
+            <Route path="/user/profile" element={<UserProfile />} />
+            <Route path="/orders/:id" element={<OrderDetail />} />
           </Route>
         </Routes>
         </Suspense>

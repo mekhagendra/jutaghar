@@ -1,6 +1,7 @@
 import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
+import TaxSettings from '../models/TaxSettings.js';
 import bcrypt from 'bcryptjs';
 
 // Get vendor statistics
@@ -488,5 +489,107 @@ export const updateSellerStatus = async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+};
+
+// ─── Tax Settings ─────────────────────────────────────────────────────────────
+
+export const getTaxSettings = async (req, res) => {
+  try {
+    let settings = await TaxSettings.findOne({ vendor: req.user._id }).populate(
+      'rules.categories',
+      'name'
+    );
+    if (!settings) {
+      settings = await TaxSettings.create({ vendor: req.user._id });
+    }
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const updateTaxSettings = async (req, res) => {
+  try {
+    const { enabled, taxLabel, defaultRate, inclusive, rules } = req.body;
+
+    if (rules !== undefined && !Array.isArray(rules)) {
+      return res.status(400).json({ success: false, message: 'rules must be an array' });
+    }
+    if (Array.isArray(rules)) {
+      for (const r of rules) {
+        if (!r.name || typeof r.rate !== 'number' || r.rate < 0 || r.rate > 100) {
+          return res.status(400).json({
+            success: false,
+            message: 'Each rule requires a name and a rate between 0 and 100',
+          });
+        }
+      }
+    }
+
+    const update = {};
+    if (enabled !== undefined) update.enabled = Boolean(enabled);
+    if (taxLabel !== undefined) update.taxLabel = String(taxLabel).substring(0, 30);
+    if (defaultRate !== undefined) update.defaultRate = Number(defaultRate);
+    if (inclusive !== undefined) update.inclusive = Boolean(inclusive);
+    if (rules !== undefined) update.rules = rules;
+
+    const settings = await TaxSettings.findOneAndUpdate(
+      { vendor: req.user._id },
+      { $set: update },
+      { new: true, upsert: true, runValidators: true }
+    ).populate('rules.categories', 'name');
+
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const addTaxRule = async (req, res) => {
+  try {
+    const { name, rate, applyToAll, categories } = req.body;
+    if (!name || typeof rate !== 'number' || rate < 0 || rate > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rule requires a name and a rate between 0 and 100',
+      });
+    }
+
+    const settings = await TaxSettings.findOneAndUpdate(
+      { vendor: req.user._id },
+      {
+        $push: {
+          rules: {
+            name,
+            rate,
+            applyToAll: applyToAll ?? true,
+            categories: categories ?? [],
+          },
+        },
+      },
+      { new: true, upsert: true }
+    ).populate('rules.categories', 'name');
+
+    res.status(201).json({ success: true, data: settings });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteTaxRule = async (req, res) => {
+  try {
+    const settings = await TaxSettings.findOneAndUpdate(
+      { vendor: req.user._id },
+      { $pull: { rules: { _id: req.params.ruleId } } },
+      { new: true }
+    ).populate('rules.categories', 'name');
+
+    if (!settings) {
+      return res.status(404).json({ success: false, message: 'Tax settings not found' });
+    }
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
   }
 };

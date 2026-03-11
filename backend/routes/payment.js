@@ -14,6 +14,9 @@ const initiateOrderValidation = [
   body('shippingAddress').notEmpty()
 ];
 
+// Tax estimate (for checkout preview)
+router.post('/tax-estimate', authenticate, paymentController.estimateTax);
+
 // Initiate order (create pending order before payment)
 router.post('/initiate', authenticate, initiateOrderValidation, paymentController.initiateOrder);
 

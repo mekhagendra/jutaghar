@@ -49,6 +49,25 @@ const Checkout: React.FC = () => {
     },
   });
 
+  // Dynamic tax from vendor settings
+  const { data: taxData } = useQuery({
+    queryKey: ['tax-estimate', items.map((i) => `${i.product._id}-${i.quantity}`).join(',')],
+    queryFn: async () => {
+      const res = await api.post<{
+        success: boolean;
+        data: { tax: number; taxDisplay: number; breakdown: { label: string; rate: number; amount: number }[] };
+      }>('/api/payment/tax-estimate', {
+        items: items.map((i) => ({
+          product: i.product._id,
+          quantity: i.quantity,
+          variant: i.selectedVariant,
+        })),
+      });
+      return res.data.data;
+    },
+    enabled: items.length > 0,
+  });
+
   const subtotal = getTotalPrice();
   const shipping = (() => {
     if (!deliverySettings) return 0;
@@ -56,7 +75,15 @@ const Checkout: React.FC = () => {
     if (freeDeliveryThreshold > 0 && subtotal >= freeDeliveryThreshold) return 0;
     return Math.max(minDeliveryFee, subtotal * deliveryFeeRate / 100);
   })();
-  const tax = subtotal * 0.1;
+  const tax = taxData?.tax ?? 0;             // exclusive add-on – added to total
+  const taxDisplay = taxData?.taxDisplay ?? taxData?.tax ?? 0; // fall back to tax if taxDisplay absent
+  const taxBreakdown = taxData?.breakdown ?? [];
+  const taxLabel =
+    taxBreakdown.length === 1
+      ? `${taxBreakdown[0].label} (${taxBreakdown[0].rate}%)`
+      : taxBreakdown.length > 1
+      ? 'Tax'
+      : 'Tax';
   const total = subtotal + shipping + tax;
 
   const onSubmit = async (data: CheckoutForm) => {
@@ -89,7 +116,7 @@ const Checkout: React.FC = () => {
 
       // Initiate order (creates pending order)
       const response = await api.post('/api/payment/initiate', orderData);
-      const { order: _order, paymentData } = response.data.data;
+      const { paymentData } = response.data.data;
       
       // Handle payment based on method
       if (data.paymentMethod === 'esewa') {
@@ -281,10 +308,12 @@ const Checkout: React.FC = () => {
                   <span className="font-medium">{formatCurrency(shipping)}</span>
                 )}
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Tax</span>
-                <span className="font-medium">{formatCurrency(tax)}</span>
-              </div>
+              {taxDisplay > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">{taxLabel}</span>
+                  <span className="font-medium">{formatCurrency(taxDisplay)}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-4">

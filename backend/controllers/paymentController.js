@@ -4,6 +4,7 @@ import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import mongoose from 'mongoose';
 import DeliverySettings from '../models/DeliverySettings.js';
+import { calculateTaxForItems } from '../utils/taxCalculator.js';
 
 // eSewa configuration
 const ESEWA_SECRET_KEY = process.env.ESEWA_SECRET_KEY || '8gBm/:&EnhH.1/q';
@@ -80,8 +81,8 @@ export const initiateOrder = async (req, res) => {
       });
     }
 
-    // Calculate totals
-    const tax = subtotal * 0.1;
+    // Calculate totals using vendor-dynamic tax settings
+    const { tax, taxDisplay } = await calculateTaxForItems(orderItems);
     const shippingCost = await DeliverySettings.calculateShipping(subtotal);
     const total = subtotal + tax + shippingCost;
 
@@ -100,7 +101,7 @@ export const initiateOrder = async (req, res) => {
       orderType: 'B2C',
       items: orderItems,
       subtotal,
-      tax,
+      tax: taxDisplay, // store the display tax amount (inclusive component or exclusive addition)
       shippingCost,
       total,
       paymentMethod,
@@ -423,6 +424,54 @@ export const initiateKhaltiPayment = async (req, res) => {
       success: false,
       message: error.response?.data?.detail || error.message || 'Failed to initiate Khalti payment'
     });
+  }
+};
+
+// Estimate tax for cart items (used on checkout page preview)
+export const estimateTax = async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'items array required' });
+    }
+
+    const resolvedItems = [];
+    for (const item of items) {
+      const product = await Product.findById(item.product)
+        .populate('vendor', '_id')
+        .select('price vendor variants');
+      if (!product) continue;
+
+      // If a variant-specific price is present use it
+      let price = product.price;
+      if (item.variant) {
+        const v = product.variants?.find(
+          (pv) =>
+            (!item.variant.color || pv.color === item.variant.color) &&
+            (!item.variant.size || pv.size === item.variant.size)
+        );
+        if (v?.price) price = v.price;
+      }
+
+      resolvedItems.push({
+        price,
+        quantity: item.quantity || 1,
+        vendor: product.vendor?._id || product.vendor,
+      });
+    }
+
+    const { tax, taxDisplay, breakdown } = await calculateTaxForItems(resolvedItems);
+
+    res.json({
+      success: true,
+      data: {
+        tax,                                              // exclusive add-on (to add to order total)
+        taxDisplay,                                       // visual amount shown on invoice
+        breakdown: breakdown.filter((b) => b.amount > 0), // only non-zero entries
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

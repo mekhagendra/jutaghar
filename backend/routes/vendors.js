@@ -29,4 +29,10 @@ router.get('/sellers', vendorController.getVendorSellers);
 router.post('/sellers', vendorController.createSeller);
 router.patch('/sellers/:sellerId/status', vendorController.updateSellerStatus);
 
+// Tax settings
+router.get('/tax', vendorController.getTaxSettings);
+router.put('/tax', vendorController.updateTaxSettings);
+router.post('/tax/rules', vendorController.addTaxRule);
+router.delete('/tax/rules/:ruleId', vendorController.deleteTaxRule);
+
 export default router;
