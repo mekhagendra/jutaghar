@@ -136,6 +136,7 @@ export interface CartItem {
     size?: string;
     sku?: string;
     price?: number;
+    image?: string;
   };
 }
 

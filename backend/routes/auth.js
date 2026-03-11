@@ -11,7 +11,7 @@ const registerValidation = [
   body('password').isLength({ min: 6 }),
   body('fullName').trim().notEmpty(),
   body('phone').trim().notEmpty(),
-  body('role').optional().isIn(['vendor', 'user'])
+  body('role').optional().isIn(['user', 'manufacturer', 'importer', 'seller'])
 ];
 
 const loginValidation = [

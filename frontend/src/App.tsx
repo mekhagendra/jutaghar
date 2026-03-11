@@ -42,6 +42,7 @@ const EditProduct = lazy(() => import('@/pages/vendor/EditProduct'));
 const ManageProducts = lazy(() => import('@/pages/vendor/ManageProducts'));
 const ManageInventory = lazy(() => import('@/pages/vendor/ManageInventory'));
 const VendorTaxSettings = lazy(() => import('@/pages/vendor/TaxSettings'));
+const VendorOrders = lazy(() => import('@/pages/vendor/Orders'));
 
 // Layout
 import MainLayout from '@/layouts/MainLayout';
@@ -91,7 +92,7 @@ const ProductsWrapper: React.FC = () => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Toaster position="top-right" />
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900" /></div>}>
         <Routes>
@@ -157,6 +158,7 @@ function App() {
             }
           >
             <Route path="/vendor/dashboard" element={<VendorDashboard />} />
+            <Route path="/vendor/orders" element={<VendorOrders />} />
             <Route path="/products/new" element={<NewProduct />} />
             <Route path="/products/manage" element={<ManageProducts />} />
             <Route path="/products/:id/edit" element={<EditProduct />} />

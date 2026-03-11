@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import api from '@/lib/api';
-import logo from '@/assets/logo1.png';
+import logo from '@/assets/logo.png';
 import { useLocation } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
 
@@ -342,18 +342,6 @@ const Navbar: React.FC = () => {
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
                   >
                     Dashboard
-                  </Link>
-                  <Link
-                    to="/orders"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
-                  >
-                    My Orders
-                  </Link>
-                  <Link
-                    to="/profile"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
-                  >
-                    Profile
                   </Link>
                   <button
                     onClick={logout}

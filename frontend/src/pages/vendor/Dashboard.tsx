@@ -118,7 +118,7 @@ const VendorDashboard: React.FC = () => {
                     <td className="py-3 px-4">
                       <span className="badge bg-blue-100 text-blue-800">{order.status}</span>
                     </td>
-                    <td className="py-3 px-4">{formatCurrency(order.totalAmount)}</td>
+                    <td className="py-3 px-4">{formatCurrency(order.total)}</td>
                   </tr>
                 ))}
               </tbody>

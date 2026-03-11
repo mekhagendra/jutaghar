@@ -12,7 +12,7 @@ interface Order {
   orderNumber: string;
   createdAt: string;
   status: string;
-  totalAmount: number;
+  total: number;
 }
 
 const UserOrders: React.FC = () => {
@@ -94,7 +94,7 @@ const UserOrders: React.FC = () => {
                         {order.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-medium">{formatCurrency(order.totalAmount)}</td>
+                    <td className="py-3 px-4 font-medium">{formatCurrency(order.total)}</td>
                     <td className="py-3 px-4">
                       <Link
                         to={`/orders/${order._id}`}

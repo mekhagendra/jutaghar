@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '@/stores/authStore';
-import { LogIn } from 'lucide-react';
+import { LogIn, Clock, Mail } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -18,6 +18,7 @@ const Login: React.FC = () => {
   const { login } = useAuthStore();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const {
     register,
@@ -34,12 +35,54 @@ const Login: React.FC = () => {
       await login(data.email, data.password);
       navigate('/');
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'Login failed. Please try again.');
+      const e = err as { response?: { data?: { message?: string } } };
+      const msg = e.response?.data?.message || '';
+      if (msg === 'Account is pending approval') {
+        setPendingEmail(data.email);
+      } else {
+        setError(msg || 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (pendingEmail) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
+        <div className="max-w-md w-full card text-center">
+          <div className="flex justify-center mb-6">
+            <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center">
+              <Clock className="w-10 h-10 text-amber-500" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Pending Approval</h2>
+          <p className="text-gray-500 mb-6">
+            Your vendor account is currently under review. Our team will verify your details and activate your account shortly.
+          </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-start gap-3 text-left">
+            <Mail className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">Check your email</p>
+              <p className="text-sm text-amber-700">
+                You'll receive a confirmation at <span className="font-semibold">{pendingEmail}</span> once your account is activated.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setPendingEmail(null)}
+            className="w-full btn btn-primary"
+          >
+            Back to Login
+          </button>
+          <p className="mt-4 text-sm text-gray-500">
+            Need help?{' '}
+            <Link to="/" className="text-primary-600 hover:text-primary-700 font-medium">Contact support</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">

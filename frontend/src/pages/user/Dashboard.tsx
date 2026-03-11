@@ -69,7 +69,7 @@ const UserDashboard: React.FC = () => {
                         {order.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4">{formatCurrency(order.totalAmount)}</td>
+                    <td className="py-3 px-4">{formatCurrency(order.total)}</td>
                     <td className="py-3 px-4">
                       <Link to={`/orders/${order._id}`} className="text-primary-600 hover:text-primary-700">
                         View

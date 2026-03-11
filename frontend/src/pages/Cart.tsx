@@ -56,12 +56,6 @@ const Cart: React.FC = () => {
   const tax = taxData?.tax ?? 0;             // exclusive only – added to total
   const taxDisplay = taxData?.taxDisplay ?? taxData?.tax ?? 0; // fall back to tax if taxDisplay absent
   const taxBreakdown = taxData?.breakdown ?? [];
-  const taxLabel =
-    taxBreakdown.length === 1
-      ? `${taxBreakdown[0].label} (${taxBreakdown[0].rate}%)`
-      : taxBreakdown.length > 1
-      ? 'Tax'
-      : 'Tax';
   const total = subtotal + deliveryFee + tax;
 
   if (items.length === 0) {

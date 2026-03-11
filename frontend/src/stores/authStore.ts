@@ -58,6 +58,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        const token = localStorage.getItem('accessToken');
+
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
 
@@ -68,7 +70,11 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
         });
 
-        api.post('/api/auth/logout').catch(() => {});
+        if (token) {
+          api.post('/api/auth/logout', {}, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => {});
+        }
       },
 
       updateUser: (user: User) => {
