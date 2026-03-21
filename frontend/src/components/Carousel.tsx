@@ -51,6 +51,17 @@ const Carousel: React.FC<CarouselProps> = ({
     }
   }, [autoPlay, interval, isHovered, nextSlide, slides.length]);
 
+  // Preload adjacent slide images for smooth transitions
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const nextIndex = (currentSlide + 1) % slides.length;
+    const prevIndex = (currentSlide - 1 + slides.length) % slides.length;
+    [nextIndex, prevIndex].forEach((idx) => {
+      const img = new Image();
+      img.src = slides[idx].image;
+    });
+  }, [currentSlide, slides]);
+
   if (slides.length === 0) {
     return (
       <div className={`${height} bg-gray-200 flex items-center justify-center`}>
@@ -67,8 +78,9 @@ const Carousel: React.FC<CarouselProps> = ({
         src={currentSlideData.image}
         alt={currentSlideData.title || `Slide ${currentSlide + 1}`}
         className="w-full h-full object-cover"
-        loading="lazy"
+        loading="eager"
         decoding="async"
+        fetchPriority="high"
       />
       
       {/* Overlay with text */}

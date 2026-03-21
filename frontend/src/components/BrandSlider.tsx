@@ -109,6 +109,8 @@ const BrandSlider: React.FC<BrandSliderProps> = ({
               src={brand.logo}
               alt={brand.name}
               className="max-w-full max-h-16 object-contain grayscale hover:grayscale-0 transition-all"
+              loading="lazy"
+              decoding="async"
             />
           </Link>
         ))}

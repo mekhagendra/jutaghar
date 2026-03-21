@@ -73,6 +73,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
             isHovered ? 'scale-110' : 'scale-100'
           } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
           loading="lazy"
+          decoding="async"
           onLoad={() => setImageLoaded(true)}
         />
 

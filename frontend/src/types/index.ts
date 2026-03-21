@@ -9,6 +9,17 @@ export interface Affiliation {
   commissionRate: number;
 }
 
+export interface VendorRequest {
+  status: 'none' | 'pending' | 'approved' | 'rejected';
+  type?: BusinessType;
+  businessName?: string;
+  businessAddress?: string;
+  taxId?: string;
+  requestedAt?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+}
+
 export interface User {
   _id: string;
   email: string;
@@ -16,11 +27,14 @@ export interface User {
   phone: string;
   role: UserRole;
   status: UserStatus;
+  avatar?: string;
+  googleId?: string;
   businessName?: string;
   businessType?: BusinessType;
   businessLicense?: string;
   businessAddress?: string;
   taxId?: string;
+  vendorRequest?: VendorRequest;
   affiliations?: Affiliation[];
   affiliatedBy?: string;
   approvedAt?: string;

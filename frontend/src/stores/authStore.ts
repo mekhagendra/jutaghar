@@ -9,6 +9,7 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
   register: (data: Record<string, unknown>) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
@@ -26,6 +27,24 @@ export const useAuthStore = create<AuthState>()(
         const response = await api.post<{ success: boolean; data: AuthResponse }>('/api/auth/login', {
           email,
           password,
+        });
+
+        const { user, accessToken, refreshToken } = response.data.data;
+
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+
+        set({
+          user,
+          accessToken,
+          refreshToken,
+          isAuthenticated: true,
+        });
+      },
+
+      googleLogin: async (credential: string) => {
+        const response = await api.post<{ success: boolean; data: AuthResponse }>('/api/auth/google', {
+          credential,
         });
 
         const { user, accessToken, refreshToken } = response.data.data;

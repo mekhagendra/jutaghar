@@ -29,7 +29,6 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
     minlength: 6
   },
   fullName: {
@@ -37,8 +36,14 @@ const userSchema = new mongoose.Schema({
     required: true
   },
   phone: {
+    type: String
+  },
+  googleId: {
     type: String,
-    required: true
+    sparse: true
+  },
+  avatar: {
+    type: String
   },
   role: {
     type: String,
@@ -74,6 +79,29 @@ const userSchema = new mongoose.Schema({
     ref: 'User'
   },
   
+  // Vendor request (user requests to become vendor from profile)
+  vendorRequest: {
+    status: {
+      type: String,
+      enum: ['none', 'pending', 'approved', 'rejected'],
+      default: 'none'
+    },
+    type: {
+      type: String,
+      enum: ['manufacturer', 'importer', 'seller']
+    },
+    businessName: String,
+    businessAddress: String,
+    taxId: String,
+    requestedAt: Date,
+    reviewedAt: Date,
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    rejectionReason: String
+  },
+
   // Timestamps
   approvedAt: Date,
   approvedBy: {

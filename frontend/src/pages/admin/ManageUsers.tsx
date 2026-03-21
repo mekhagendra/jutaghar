@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Phone, Calendar, Eye } from 'lucide-react';
+import { Mail, Phone, Calendar, Eye, Store, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 
@@ -16,6 +16,14 @@ interface User {
     _id: string;
     fullName: string;
     businessName?: string;
+  };
+  vendorRequest?: {
+    status: string;
+    type: string;
+    businessName: string;
+    businessAddress: string;
+    taxId: string;
+    requestedAt: string;
   };
 }
 
@@ -61,6 +69,31 @@ const ManageUsers: React.FC = () => {
     },
     onError: () => {
       toast.error('Failed to update user role');
+    },
+  });
+
+  // Vendor requests
+  const { data: vendorRequests = [] } = useQuery<User[]>({
+    queryKey: ['vendor-requests'],
+    queryFn: async () => {
+      const res = await api.get('/api/auth/vendor-requests');
+      return res.data.data;
+    },
+  });
+
+  const [rejectionReason, setRejectionReason] = React.useState<Record<string, string>>({});
+
+  const reviewVendorMutation = useMutation({
+    mutationFn: async ({ userId, action, reason }: { userId: string; action: 'approve' | 'reject'; reason?: string }) => {
+      await api.patch(`/api/auth/vendor-requests/${userId}`, { action, rejectionReason: reason });
+    },
+    onSuccess: (_, { action }) => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success(action === 'approve' ? 'Vendor request approved' : 'Vendor request rejected');
+    },
+    onError: () => {
+      toast.error('Failed to review vendor request');
     },
   });
 
@@ -251,6 +284,68 @@ const ManageUsers: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Pending Vendor Requests */}
+      {vendorRequests.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Store className="w-5 h-5 text-amber-500" />
+            Pending Vendor Requests
+            <span className="ml-2 bg-amber-100 text-amber-700 text-xs font-medium px-2 py-0.5 rounded-full">{vendorRequests.length}</span>
+          </h2>
+          <div className="space-y-4">
+            {vendorRequests.map((req) => (
+              <div key={req._id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{req.fullName}</div>
+                    <div className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
+                      <Mail className="w-3.5 h-3.5" /> {req.email}
+                      {req.phone && <> &middot; <Phone className="w-3.5 h-3.5" /> {req.phone}</>}
+                    </div>
+                    <div className="mt-2 text-sm text-gray-700 flex flex-wrap gap-x-4 gap-y-1">
+                      <span><span className="text-gray-500">Type:</span> <span className="capitalize font-medium">{req.vendorRequest?.type}</span></span>
+                      <span><span className="text-gray-500">Business:</span> {req.vendorRequest?.businessName}</span>
+                      {req.vendorRequest?.businessAddress && (
+                        <span><span className="text-gray-500">Address:</span> {req.vendorRequest.businessAddress}</span>
+                      )}
+                      {req.vendorRequest?.taxId && (
+                        <span><span className="text-gray-500">Tax ID:</span> {req.vendorRequest.taxId}</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Requested {new Date(req.vendorRequest?.requestedAt || '').toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                    <input
+                      type="text"
+                      placeholder="Rejection reason (optional)"
+                      value={rejectionReason[req._id] || ''}
+                      onChange={(e) => setRejectionReason((prev) => ({ ...prev, [req._id]: e.target.value }))}
+                      className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <button
+                      onClick={() => reviewVendorMutation.mutate({ userId: req._id, action: 'approve' })}
+                      disabled={reviewVendorMutation.isPending}
+                      className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition disabled:opacity-60"
+                    >
+                      <CheckCircle className="w-4 h-4" /> Approve
+                    </button>
+                    <button
+                      onClick={() => reviewVendorMutation.mutate({ userId: req._id, action: 'reject', reason: rejectionReason[req._id] })}
+                      disabled={reviewVendorMutation.isPending}
+                      className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition disabled:opacity-60"
+                    >
+                      <XCircle className="w-4 h-4" /> Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Users List */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">

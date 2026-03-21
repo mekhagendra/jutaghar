@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '@/stores/authStore';
 import { LogIn, Clock, Mail } from 'lucide-react';
 
@@ -15,7 +16,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { login, googleLogin } = useAuthStore();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
@@ -140,6 +141,46 @@ const Login: React.FC = () => {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-white px-4 text-gray-500">Or continue with</span>
+          </div>
+        </div>
+
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={async (credentialResponse) => {
+              try {
+                setLoading(true);
+                setError('');
+                if (credentialResponse.credential) {
+                  await googleLogin(credentialResponse.credential);
+                  navigate('/');
+                }
+              } catch (err: unknown) {
+                const e = err as { response?: { data?: { message?: string } } };
+                const msg = e.response?.data?.message || '';
+                if (msg === 'Account is pending approval') {
+                  setPendingEmail('your Google account');
+                } else {
+                  setError(msg || 'Google sign-in failed. Please try again.');
+                }
+              } finally {
+                setLoading(false);
+              }
+            }}
+            onError={() => {
+              setError('Google sign-in failed. Please try again.');
+            }}
+            size="large"
+            width="100%"
+            text="signin_with"
+          />
+        </div>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { User, Phone, Mail, Lock, Save } from 'lucide-react';
+import { User, Phone, Mail, Lock, Save, Store, Clock, CheckCircle, XCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -46,6 +46,50 @@ const UserProfile: React.FC = () => {
       toast.error('Failed to change password. Check your current password.');
     },
   });
+
+  // Vendor request state
+  const [vendorForm, setVendorForm] = useState({
+    type: '' as '' | 'manufacturer' | 'importer' | 'seller',
+    businessName: '',
+    businessAddress: '',
+    taxId: '',
+  });
+
+  const vendorRequestMutation = useMutation({
+    mutationFn: async (data: { type: string; businessName: string; businessAddress: string; taxId: string }) => {
+      const response = await api.post('/api/auth/vendor-request', data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success('Vendor request submitted!');
+      if (data.data?.vendorRequest) {
+        updateUser({ ...user!, vendorRequest: data.data.vendorRequest });
+      }
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'Failed to submit vendor request');
+    },
+  });
+
+  const handleVendorSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vendorForm.businessName.trim()) {
+      toast.error('Business name is required');
+      return;
+    }
+    if (!vendorForm.type) {
+      toast.error('Please select a business category');
+      return;
+    }
+    if (!vendorForm.taxId.trim()) {
+      toast.error('Business Tax ID is required');
+      return;
+    }
+    vendorRequestMutation.mutate(vendorForm);
+  };
+
+  const isRegularUser = user?.role === 'user';
+  const vendorRequestStatus = user?.vendorRequest?.status || 'none';
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,6 +240,127 @@ const UserProfile: React.FC = () => {
           </form>
         </div>
       </div>
+
+      {/* Vendor Request Section — only for regular users */}
+      {isRegularUser && (
+        <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Store className="w-4 h-4" />
+            Become a Vendor
+          </h2>
+
+          {vendorRequestStatus === 'pending' && (
+            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <Clock className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-amber-800">Request Pending</p>
+                <p className="text-sm text-amber-700 mt-1">
+                  Your vendor request as <span className="font-semibold capitalize">{user?.vendorRequest?.type}</span> is under review.
+                  You'll be notified once it's approved.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {vendorRequestStatus === 'rejected' && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg p-4">
+                <XCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-red-800">Request Rejected</p>
+                  <p className="text-sm text-red-700 mt-1">
+                    Your previous vendor request was rejected.
+                    {user?.vendorRequest?.rejectionReason && (
+                      <> Reason: <span className="font-medium">{user.vendorRequest.rejectionReason}</span></>
+                    )}
+                  </p>
+                  <p className="text-sm text-red-600 mt-2">You can submit a new request below.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {vendorRequestStatus === 'approved' && (
+            <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-lg p-4">
+              <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-green-800">Request Approved!</p>
+                <p className="text-sm text-green-700 mt-1">
+                  Your vendor account has been approved. Please log out and log back in to access your vendor dashboard.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {(vendorRequestStatus === 'none' || vendorRequestStatus === 'rejected') && (
+            <form onSubmit={handleVendorSubmit} className="space-y-4 mt-4">
+              <p className="text-sm text-gray-600">
+                Apply to become a vendor on Juta Ghar. Fill in your business details below.
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Business Name *</label>
+                <input
+                  type="text"
+                  value={vendorForm.businessName}
+                  onChange={(e) => setVendorForm((f) => ({ ...f, businessName: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Your company name"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Business Category *</label>
+                  <select
+                    value={vendorForm.type}
+                    onChange={(e) => setVendorForm((f) => ({ ...f, type: e.target.value as typeof vendorForm.type }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                    required
+                  >
+                    <option value="">Select category</option>
+                    <option value="manufacturer">Manufacture</option>
+                    <option value="importer">Import</option>
+                    <option value="seller">Retail</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Business Tax ID *</label>
+                  <input
+                    type="text"
+                    value={vendorForm.taxId}
+                    onChange={(e) => setVendorForm((f) => ({ ...f, taxId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="PAN / VAT number"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Business Address</label>
+                <input
+                  type="text"
+                  value={vendorForm.businessAddress}
+                  onChange={(e) => setVendorForm((f) => ({ ...f, businessAddress: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Street, City, Province"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={vendorRequestMutation.isPending || !vendorForm.type || !vendorForm.taxId.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-60"
+              >
+                <Store className="w-4 h-4" />
+                {vendorRequestMutation.isPending ? 'Submitting...' : 'Submit Vendor Request'}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -10,8 +10,7 @@ const registerValidation = [
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 6 }),
   body('fullName').trim().notEmpty(),
-  body('phone').trim().notEmpty(),
-  body('role').optional().isIn(['user', 'manufacturer', 'importer', 'seller'])
+  body('phone').trim().notEmpty()
 ];
 
 const loginValidation = [
@@ -22,8 +21,16 @@ const loginValidation = [
 // Routes
 router.post('/register', registerValidation, authController.register);
 router.post('/login', loginValidation, authController.login);
+router.post('/google', authController.googleLogin);
 router.post('/refresh', authController.refreshToken);
 router.get('/me', authenticate, authController.getCurrentUser);
 router.post('/logout', authenticate, authController.logout);
+
+// Vendor request (authenticated users)
+router.post('/vendor-request', authenticate, authController.requestVendor);
+
+// Admin: manage vendor requests
+router.get('/vendor-requests', authenticate, authController.getVendorRequests);
+router.patch('/vendor-requests/:id', authenticate, authController.reviewVendorRequest);
 
 export default router;
