@@ -185,7 +185,7 @@ const Navbar: React.FC = () => {
         categoriesWithInventory.forEach(cat => {
           items.push({
             label: cat.name,
-            path: `/products?gender=${gender}&category=${cat.slug}`
+            path: `/products?gender=${gender}&category=${cat.name}`
           });
         });
       }
@@ -284,8 +284,8 @@ const Navbar: React.FC = () => {
 
                 {/* Dropdown Menu */}
                 {item.submenu && item.submenu.length > 0 && (
-                  <div className="absolute left-0 top-full pt-2 w-56 z-[100]">
-                    <div className="bg-white rounded-md shadow-lg py-2 border border-gray-100 opacity-0 scale-95 invisible group-hover:opacity-100 group-hover:scale-100 group-hover:visible transition-all duration-200">
+                  <div className="absolute left-0 top-full w-56 z-[100] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200">
+                    <div className="mt-2 bg-white rounded-md shadow-lg py-2 border border-gray-100">
                       {item.submenu.map((subItem) => (
                         <Link
                           key={subItem.label}
@@ -358,12 +358,6 @@ const Navbar: React.FC = () => {
                   className="text-sm font-medium text-gray-700 hover:text-primary-600 transition-colors"
                 >
                   Login
-                </Link>
-                <Link
-                  to="/register"
-                  className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
-                >
-                  Sign Up
                 </Link>
               </div>
             )}

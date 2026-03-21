@@ -18,6 +18,7 @@ const createProductValidation = [
 
 // Public routes
 router.get('/', optionalAuth, productController.getProducts);
+router.get('/colors', productController.getProductColors);
 
 // Wholesale products (only accessible to sellers) - must be before /:id route
 router.get('/wholesale/catalog', authenticate, productController.getWholesaleProducts);

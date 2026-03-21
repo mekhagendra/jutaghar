@@ -8,6 +8,9 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import fs from 'fs';
 
+// Load environment variables FIRST so UPLOAD_DIR is available everywhere
+dotenv.config();
+
 /**
  * JutaGhar E-commerce API Server
  * 
@@ -49,9 +52,6 @@ import { apiVersionMiddleware, restfulCorsMiddleware } from './utils/restful.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load environment variables
-dotenv.config();
 
 // Create Express app
 const app = express();

@@ -2,6 +2,7 @@ import { validationResult } from 'express-validator';
 import Category from '../models/Category.js';
 import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
+import { saveBase64Image } from '../utils/imageStorage.js';
 
 // ========== CATEGORIES ==========
 
@@ -29,11 +30,13 @@ export const getCategories = async (req, res) => {
         
         // Add gender filter - include unisex products for all genders
         if (gender) {
+          // Capitalize first letter to match enum values (Men, Women, Kids, Unisex)
+          const normalizedGender = gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
           productQuery.$and = [
             {
               $or: [
-                { gender: gender.toLowerCase() },
-                { gender: 'unisex' }
+                { gender: normalizedGender },
+                { gender: 'Unisex' }
               ]
             }
           ];
@@ -77,7 +80,12 @@ export const createCategory = async (req, res) => {
       });
     }
 
-    const category = await Category.create(req.body);
+    const categoryData = { ...req.body };
+    if (categoryData.image) {
+      categoryData.image = saveBase64Image(categoryData.image, 'categories');
+    }
+
+    const category = await Category.create(categoryData);
 
     res.status(201).json({
       success: true,
@@ -99,9 +107,14 @@ export const createCategory = async (req, res) => {
 
 export const updateCategory = async (req, res) => {
   try {
+    const updateData = { ...req.body };
+    if (updateData.image) {
+      updateData.image = saveBase64Image(updateData.image, 'categories');
+    }
+
     const category = await Category.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
 
@@ -209,7 +222,12 @@ export const createBrand = async (req, res) => {
       });
     }
 
-    const brand = await Brand.create(req.body);
+    const brandData = { ...req.body };
+    if (brandData.logo) {
+      brandData.logo = saveBase64Image(brandData.logo, 'brands');
+    }
+
+    const brand = await Brand.create(brandData);
 
     res.status(201).json({
       success: true,
@@ -231,9 +249,14 @@ export const createBrand = async (req, res) => {
 
 export const updateBrand = async (req, res) => {
   try {
+    const updateData = { ...req.body };
+    if (updateData.logo) {
+      updateData.logo = saveBase64Image(updateData.logo, 'brands');
+    }
+
     const brand = await Brand.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
 

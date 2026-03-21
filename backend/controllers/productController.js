@@ -1,5 +1,6 @@
 import { validationResult } from 'express-validator';
 import Product from '../models/Product.js';
+import { processProductImages } from '../utils/imageStorage.js';
 
 // Get all products with filters
 export const getProducts = async (req, res) => {
@@ -73,6 +74,20 @@ export const getProducts = async (req, res) => {
     }
     if (search) {
       query.$text = { $search: search };
+    }
+
+    // Filter by variant color
+    if (req.query.color) {
+      const colors = req.query.color.split(',').map(c => c.trim());
+      query['variants.color'] = colors.length > 1
+        ? { $in: colors.map(c => new RegExp(`^${c}$`, 'i')) }
+        : new RegExp(`^${colors[0]}$`, 'i');
+    }
+
+    // Filter by variant size
+    if (req.query.size) {
+      const sizes = req.query.size.split(',').map(s => s.trim());
+      query['variants.size'] = sizes.length > 1 ? { $in: sizes } : sizes[0];
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -176,6 +191,9 @@ export const createProduct = async (req, res) => {
       vendor: req.user._id
     };
 
+    // Save base64 images to upload directory
+    processProductImages(productData);
+
     // Validate wholesale pricing based on role
     if (req.user.role === 'manufacturer' || req.user.role === 'importer') {
       // Manufacturers and importers MUST provide wholesale pricing
@@ -240,6 +258,9 @@ export const updateProduct = async (req, res) => {
         message: 'Not authorized to update this product'
       });
     }
+
+    // Save base64 images to upload directory
+    processProductImages(req.body);
 
     Object.assign(product, req.body);
     await product.save();
@@ -491,5 +512,24 @@ export const recalculateAllStock = async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+};
+
+// Get unique colors from all active product variants
+export const getProductColors = async (req, res) => {
+  try {
+    const colors = await Product.aggregate([
+      { $match: { status: 'active' } },
+      { $unwind: '$variants' },
+      { $match: { 'variants.color': { $exists: true, $ne: '' } } },
+      { $group: { _id: { $toLower: '$variants.color' }, name: { $first: '$variants.color' } } },
+      { $sort: { _id: 1 } }
+    ]);
+    res.json({
+      success: true,
+      data: colors.map(c => c.name)
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

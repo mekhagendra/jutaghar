@@ -111,16 +111,16 @@ const Products: React.FC = () => {
     role: vendor.role 
   }));
   const sizeOptions = ['6', '7', '8', '9', '10', '11', '12', '13'];
-  const colorOptions = [
-    { name: 'Black', hex: '#000000' },
-    { name: 'White', hex: '#FFFFFF' },
-    { name: 'Brown', hex: '#8B4513' },
-    { name: 'Blue', hex: '#0000FF' },
-    { name: 'Red', hex: '#FF0000' },
-    { name: 'Gray', hex: '#808080' },
-    { name: 'Beige', hex: '#F5F5DC' },
-    { name: 'Green', hex: '#008000' },
-  ];
+
+  // Fetch unique colors from product variants
+  const { data: colorsData } = useQuery({
+    queryKey: ['productColors'],
+    queryFn: async () => {
+      const response = await api.get('/api/products/colors');
+      return response.data;
+    },
+  });
+  const colorOptions: string[] = Array.isArray(colorsData?.data) ? colorsData.data : [];
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['products', gender, category, brand, search, sort, vendor, minPrice, maxPrice, size, color, inStock],
@@ -492,19 +492,19 @@ const Products: React.FC = () => {
               {/* Color Filter */}
               <div className="border-t pt-4">
                 <h4 className="font-medium text-gray-900 mb-3">Color</h4>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="flex flex-wrap gap-2">
                   {colorOptions.map((color) => (
                     <button
-                      key={color.name}
-                      onClick={() => handleFilterChange('color', color.name)}
-                      className={`w-10 h-10 rounded-full border-2 transition ${
-                        selectedColors.includes(color.name)
-                          ? 'border-primary-600 ring-2 ring-primary-200'
-                          : 'border-gray-300 hover:border-gray-400'
+                      key={color}
+                      onClick={() => handleFilterChange('color', color)}
+                      className={`px-3 py-1 text-sm rounded-full border transition ${
+                        selectedColors.includes(color)
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-primary-400'
                       }`}
-                      style={{ backgroundColor: color.hex }}
-                      title={color.name}
-                    />
+                    >
+                      {color}
+                    </button>
                   ))}
                 </div>
               </div>

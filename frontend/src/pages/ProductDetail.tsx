@@ -20,6 +20,7 @@ const ProductDetail: React.FC = () => {
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState('');
+  const [activeImage, setActiveImage] = useState<string>('');
 
   // Review form state
   const [reviewRating, setReviewRating] = useState(0);
@@ -188,18 +189,44 @@ const ProductDetail: React.FC = () => {
         {/* Images */}
         <div>
           <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-4">
-            {(product.mainImage || product.images?.[0]) ? (
-              <img
-                src={product.mainImage || product.images[0]}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                No Image
-              </div>
-            )}
+            {(() => {
+              const allImages = [product.mainImage, ...(product.images || [])].filter(Boolean);
+              const displayImage = activeImage || allImages[0];
+              return displayImage ? (
+                <img
+                  src={displayImage}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  No Image
+                </div>
+              );
+            })()}
           </div>
+          {/* Thumbnail gallery */}
+          {(() => {
+            const allImages = [product.mainImage, ...(product.images || [])].filter(Boolean);
+            if (allImages.length <= 1) return null;
+            return (
+              <div className="grid grid-cols-5 gap-2">
+                {allImages.map((img: string, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImage(img)}
+                    className={`aspect-square rounded-lg overflow-hidden border-2 transition ${
+                      (activeImage || allImages[0]) === img
+                        ? 'border-primary-600'
+                        : 'border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Details */}

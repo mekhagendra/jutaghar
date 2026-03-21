@@ -26,14 +26,20 @@ const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/products" className="hover:text-white transition">
-                  Products
+                <Link to="/about-us" className="hover:text-white transition">
+                  About Us
                 </Link>
               </li>
               <li>
-                <Link to="/register" className="hover:text-white transition">
-                  Become a Vendor
+                <Link to="/return-policy" className="hover:text-white transition">
+                  Return Policy
                 </Link>
+                <li>
+                <Link to="/privacy-policy" className="hover:text-white transition">
+                  Privacy Policy
+                </Link>
+                </li>
+                
               </li>
             </ul>
           </div>
@@ -44,17 +50,17 @@ const Footer: React.FC = () => {
             <ul className="space-y-2 text-sm">
               <li>
                 <a href="#" className="hover:text-white transition">
-                  Help Center
+                  Track Order
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-white transition">
+                  Return Order
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white transition">
                   Shipping Info
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white transition">
-                  Returns
                 </a>
               </li>
               <li>
@@ -67,7 +73,7 @@ const Footer: React.FC = () => {
 
           {/* Connect */}
           <div>
-            <h3 className="text-white text-lg font-semibold mb-4">Connect With Us</h3>
+            <h3 className="text-white text-lg font-semibold mb-4">Stay Connected</h3>
             <div className="flex space-x-4">
               <a href="#" className="hover:text-white transition">
                 <Facebook className="w-6 h-6" />
@@ -82,6 +88,7 @@ const Footer: React.FC = () => {
                 <Mail className="w-6 h-6" />
               </a>
             </div>
+            <div> </div>
           </div>
         </div>
 
