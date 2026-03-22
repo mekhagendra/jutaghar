@@ -84,6 +84,11 @@ export const getProducts = async (req, res) => {
         : new RegExp(`^${colors[0]}$`, 'i');
     }
 
+    // Filter by onSale
+    if (req.query.onSale === 'true') {
+      query.onSale = true;
+    }
+
     // Filter by variant size
     if (req.query.size) {
       const sizes = req.query.size.split(',').map(s => s.trim());

@@ -211,6 +211,7 @@ const Navbar: React.FC = () => {
       },
       { label: 'New Arrival', path: '/products?sort=new' },
       { label: 'Best Seller', path: '/products?sort=popular' },
+      { label: 'Sale', path: '/sale' },
       { label: 'Outlets', path: '/outlets' },
     ];
   }, [menCategories, womenCategories, kidsCategories]);
@@ -273,7 +274,11 @@ const Navbar: React.FC = () => {
               >
                 <Link
                   to={item.path}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 transition-colors flex items-center gap-1"
+                  className={`px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${
+                    item.label === 'Sale'
+                      ? 'text-red-600 hover:text-red-700 font-bold'
+                      : 'text-gray-700 hover:text-primary-600'
+                  }`}
                   onClick={() => window.scrollTo(0, 0)}
                 >
                   {item.label}
@@ -382,7 +387,11 @@ const Navbar: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <Link
                     to={item.path}
-                    className="block py-2 text-gray-700 hover:text-primary-600 font-medium flex-1"
+                    className={`block py-2 font-medium flex-1 ${
+                      item.label === 'Sale'
+                        ? 'text-red-600 hover:text-red-700 font-bold'
+                        : 'text-gray-700 hover:text-primary-600'
+                    }`}
                     onClick={() => handleMobileNavigation()}
                   >
                     {item.label}

@@ -13,6 +13,8 @@ interface Product {
   sku?: string;
   category: string | { _id: string; name: string };
   price: number;
+  onSale?: boolean;
+  salePrice?: number;
   wholesalePrice?: number;
   stock: number;
   status: string;
@@ -51,6 +53,38 @@ const ManageProducts: React.FC = () => {
     if (confirm('Are you sure you want to delete this product?')) {
       setDeleteId(productId);
       deleteProductMutation.mutate(productId);
+    }
+  };
+
+  // Sale management
+  const [salePriceInputs, setSalePriceInputs] = useState<Record<string, string>>({});
+
+  const saleMutation = useMutation({
+    mutationFn: async ({ productId, onSale, salePrice }: { productId: string; onSale: boolean; salePrice?: number }) => {
+      await api.patch(`/api/products/${productId}`, { onSale, salePrice: onSale ? salePrice : undefined });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-products'] });
+      toast.success('Sale updated');
+    },
+    onError: () => {
+      toast.error('Failed to update sale');
+    },
+  });
+
+  const handleSaleToggle = (product: Product) => {
+    if (product.onSale) {
+      // Turning off sale
+      saleMutation.mutate({ productId: product._id, onSale: false });
+    } else {
+      // Turning on — need a sale price
+      const raw = salePriceInputs[product._id];
+      const salePrice = raw ? Number(raw) : undefined;
+      if (!salePrice || salePrice <= 0 || salePrice >= product.price) {
+        toast.error('Enter a valid sale price less than retail price');
+        return;
+      }
+      saleMutation.mutate({ productId: product._id, onSale: true, salePrice });
     }
   };
 
@@ -97,6 +131,7 @@ const ManageProducts: React.FC = () => {
                   <th className="text-left py-3 px-4 font-semibold">Product</th>
                   <th className="text-left py-3 px-4 font-semibold">Category</th>
                   <th className="text-left py-3 px-4 font-semibold">Price</th>
+                  <th className="text-left py-3 px-4 font-semibold">Sale</th>
                   <th className="text-left py-3 px-4 font-semibold">Stock</th>
                   <th className="text-left py-3 px-4 font-semibold">Status</th>
                   <th className="text-right py-3 px-4 font-semibold">Actions</th>
@@ -131,6 +166,34 @@ const ManageProducts: React.FC = () => {
                           <p className="text-sm text-gray-600">
                             Wholesale: {formatCurrency(product.wholesalePrice)}
                           </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={product.onSale || false}
+                          onChange={() => handleSaleToggle(product)}
+                          disabled={saleMutation.isPending}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                        {product.onSale ? (
+                          <span className="text-sm font-medium text-red-600">
+                            {formatCurrency(product.salePrice!)}
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              placeholder="Sale price"
+                              value={salePriceInputs[product._id] ?? ''}
+                              onChange={(e) => setSalePriceInputs(prev => ({ ...prev, [product._id]: e.target.value }))}
+                              className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
                         )}
                       </div>
                     </td>

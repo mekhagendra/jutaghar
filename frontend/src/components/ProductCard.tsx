@@ -26,6 +26,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
     ? Math.round(((product.compareAtPrice! - product.price) / product.compareAtPrice!) * 100)
     : 0;
 
+  const hasSale = product.onSale && product.salePrice && product.salePrice < product.price;
+  const salePercent = hasSale
+    ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
+    : 0;
+
   // Check if user is a seller who can see wholesale prices
   const isSeller = user?.role === 'seller' || user?.businessType === 'seller';
   const hasWholesalePrice = product.wholesalePrice && product.wholesalePrice > 0;
@@ -105,9 +110,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
               Only {product.stock} Left
             </span>
           )}
-          {hasDiscount && (
+          {hasDiscount && !hasSale && (
             <span className="px-2 py-1 text-xs font-semibold rounded bg-red-500 text-white">
               -{discountPercent}%
+            </span>
+          )}
+          {hasSale && (
+            <span className="px-2 py-1 text-xs font-semibold rounded bg-red-500 text-white">
+              SALE -{salePercent}%
             </span>
           )}
           {isSeller && hasWholesalePrice && (
@@ -206,13 +216,26 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
             </>
           ) : (
             <div className="flex items-baseline gap-2">
-              <span className="text-lg font-bold text-gray-900">
-                {formatCurrency(product.price)}
-              </span>
-              {hasDiscount && (
-                <span className="text-sm text-gray-500 line-through">
-                  {formatCurrency(product.compareAtPrice!)}
-                </span>
+              {product.onSale && product.salePrice ? (
+                <>
+                  <span className="text-lg font-bold text-red-600">
+                    {formatCurrency(product.salePrice)}
+                  </span>
+                  <span className="text-sm text-gray-500 line-through">
+                    {formatCurrency(product.price)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg font-bold text-gray-900">
+                    {formatCurrency(product.price)}
+                  </span>
+                  {hasDiscount && (
+                    <span className="text-sm text-gray-500 line-through">
+                      {formatCurrency(product.compareAtPrice!)}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )}

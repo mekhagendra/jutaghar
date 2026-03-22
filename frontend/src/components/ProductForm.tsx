@@ -13,6 +13,8 @@ export interface ProductFormData {
   gender: string;
   mainImage?: string;
   images?: string[];
+  onSale?: boolean;
+  salePrice?: number;
   wholesalePrice?: number;
   minWholesaleQuantity?: number;
   isWholesaleOnly?: boolean;
@@ -37,6 +39,8 @@ interface ProductInitialData {
   gender?: string;
   mainImage?: string;
   images?: string[];
+  onSale?: boolean;
+  salePrice?: number;
   wholesalePrice?: number;
   minWholesaleQuantity?: number;
   isWholesaleOnly?: boolean;
@@ -106,6 +110,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
     gender: initialData?.gender || 'Unisex',
     mainImage: initialData?.mainImage || '',
     images: initialData?.images || [],
+    onSale: initialData?.onSale || false,
+    salePrice: initialData?.salePrice,
     wholesalePrice: initialData?.wholesalePrice,
     minWholesaleQuantity: initialData?.minWholesaleQuantity || 10,
     isWholesaleOnly: initialData?.isWholesaleOnly || false,
@@ -123,7 +129,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
     
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : type === 'number' ? parseFloat(value) || 0 : value
+      [name]: type === 'checkbox' ? checked : type === 'number' ? (value === '' ? 0 : Number(value)) : value
     }));
     
     if (errors[name as keyof ProductFormData]) {
@@ -406,7 +412,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
             <input
               type="number"
               name="price"
-              value={formData.price}
+              value={formData.price || ''}
               onChange={handleChange}
               min="0"
               step="0.01"
@@ -432,7 +438,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
               <input
                 type="number"
                 name="wholesalePrice"
-                value={formData.wholesalePrice || ''}
+                value={formData.wholesalePrice ?? ''}
                 onChange={handleChange}
                 min="0"
                 step="0.01"
@@ -450,7 +456,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
               <input
                 type="number"
                 name="minWholesaleQuantity"
-                value={formData.minWholesaleQuantity || ''}
+                value={formData.minWholesaleQuantity ?? ''}
                 onChange={handleChange}
                 min="1"
                 className={`input ${errors.minWholesaleQuantity ? 'border-red-500' : ''}`}
@@ -549,10 +555,10 @@ const ProductForm: React.FC<ProductFormProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={variant.price}
+                      value={variant.price || ''}
                       onChange={(e) => {
                         const newVariants = [...formData.variants!];
-                        newVariants[index].price = parseFloat(e.target.value) || 0;
+                        newVariants[index].price = e.target.value === '' ? 0 : Number(e.target.value);
                         setFormData(prev => ({ ...prev, variants: newVariants }));
                       }}
                       className="input text-sm"
@@ -568,10 +574,10 @@ const ProductForm: React.FC<ProductFormProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={variant.quantity}
+                      value={variant.quantity || ''}
                       onChange={(e) => {
                         const newVariants = [...formData.variants!];
-                        newVariants[index].quantity = parseInt(e.target.value) || 0;
+                        newVariants[index].quantity = e.target.value === '' ? 0 : Number(e.target.value);
                         setFormData(prev => ({ ...prev, variants: newVariants }));
                       }}
                       className="input text-sm"
@@ -654,7 +660,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
                 <input
                   type="number"
                   name="stock"
-                  value={formData.stock || 0}
+                  value={formData.stock || ''}
                   onChange={handleChange}
                   min="0"
                   className="input"

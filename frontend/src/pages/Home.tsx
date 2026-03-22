@@ -3,6 +3,7 @@ import Why from '@/components/why';
 import Hero from '@/components/hero';
 import NewArrival from '@/components/NewArrival';
 import Featured from '@/components/Featured';
+import Sale from '@/components/sale';
 import Brands from '@/components/brands';
 import BestSeller from '@/components/bestSeller';
 import Category from '@/components/category';
@@ -21,13 +22,15 @@ const Home: React.FC = () => {
 
       <NewArrival />
 
+      <Brands />
+
+      <Sale />
+
       <BannerPremium />
 
       <BestSeller />
 
       <BannerSports />
-
-      <Brands />
 
       <Category />
 

@@ -10,6 +10,7 @@ const Brands: React.FC = () => {
       const response = await api.get('/api/catalog/brands?status=active');
       return response.data;
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   const brands: Brand[] = React.useMemo(() => {

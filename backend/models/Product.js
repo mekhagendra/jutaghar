@@ -19,6 +19,14 @@ const productSchema = new mongoose.Schema({
     type: Number,
     min: 0
   },
+  onSale: {
+    type: Boolean,
+    default: false
+  },
+  salePrice: {
+    type: Number,
+    min: 0
+  },
   // Wholesale pricing for manufacturers/importers
   wholesalePrice: {
     type: Number,

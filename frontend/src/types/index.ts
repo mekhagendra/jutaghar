@@ -62,6 +62,8 @@ export interface Product {
   description: string;
   price: number;
   compareAtPrice?: number;
+  onSale?: boolean;
+  salePrice?: number;
   wholesalePrice?: number;
   minWholesaleQuantity?: number;
   isWholesaleOnly?: boolean;

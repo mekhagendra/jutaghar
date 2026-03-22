@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -25,14 +25,23 @@ const BrandSlider: React.FC<BrandSliderProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const throttleRef = useRef<number | null>(null);
 
-  const checkScrollButtons = () => {
+  const checkScrollButtons = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
     }
-  };
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (throttleRef.current) return;
+    throttleRef.current = requestAnimationFrame(() => {
+      checkScrollButtons();
+      throttleRef.current = null;
+    });
+  }, [checkScrollButtons]);
 
   const scroll = useCallback((direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -48,15 +57,21 @@ const BrandSlider: React.FC<BrandSliderProps> = ({
 
       setTimeout(checkScrollButtons, 300);
     }
-  }, []);
+  }, [checkScrollButtons]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     checkScrollButtons();
     window.addEventListener('resize', checkScrollButtons);
     return () => window.removeEventListener('resize', checkScrollButtons);
-  }, [brands]);
+  }, [brands, checkScrollButtons]);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    return () => {
+      if (throttleRef.current) cancelAnimationFrame(throttleRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (autoScroll && brands.length > itemsPerView) {
       const interval = setInterval(() => {
         if (scrollContainerRef.current) {
@@ -71,6 +86,11 @@ const BrandSlider: React.FC<BrandSliderProps> = ({
       return () => clearInterval(interval);
     }
   }, [autoScroll, scrollInterval, brands.length, itemsPerView, scroll]);
+
+  const itemWidth = useMemo(
+    () => `calc((100% - ${(itemsPerView - 1) * 16}px) / ${itemsPerView})`,
+    [itemsPerView]
+  );
 
   return (
     <div className="relative group">
@@ -89,7 +109,7 @@ const BrandSlider: React.FC<BrandSliderProps> = ({
       <div
         ref={scrollContainerRef}
         className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-2"
-        onScroll={checkScrollButtons}
+        onScroll={handleScroll}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -98,10 +118,10 @@ const BrandSlider: React.FC<BrandSliderProps> = ({
         {brands.map((brand) => (
           <Link
             key={brand.id}
-            to={`/brands/${brand.slug}`}
-            className="flex-shrink-0 bg-white rounded-lg p-6 hover:shadow-lg transition-shadow border border-gray-200 flex items-center justify-center"
+            to={`/products?brand=${encodeURIComponent(brand.name)}`}
+            className="flex-shrink-0 rounded-lg p-6 hover:shadow-lg transition-shadow flex items-center justify-center"
             style={{
-              width: `calc((100% - ${(itemsPerView - 1) * 16}px) / ${itemsPerView})`,
+              width: itemWidth,
               minWidth: '120px',
             }}
           >
@@ -130,4 +150,4 @@ const BrandSlider: React.FC<BrandSliderProps> = ({
   );
 };
 
-export default BrandSlider;
+export default React.memo(BrandSlider);

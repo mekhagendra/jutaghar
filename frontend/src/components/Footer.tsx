@@ -21,11 +21,6 @@ const Footer: React.FC = () => {
             <h3 className="text-white text-lg font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/" className="hover:text-white transition">
-                  Home
-                </Link>
-              </li>
-              <li>
                 <Link to="/about-us" className="hover:text-white transition">
                   About Us
                 </Link>
@@ -34,12 +29,11 @@ const Footer: React.FC = () => {
                 <Link to="/return-policy" className="hover:text-white transition">
                   Return Policy
                 </Link>
-                <li>
+              </li>
+              <li>
                 <Link to="/privacy-policy" className="hover:text-white transition">
                   Privacy Policy
                 </Link>
-                </li>
-                
               </li>
             </ul>
           </div>
@@ -49,24 +43,19 @@ const Footer: React.FC = () => {
             <h3 className="text-white text-lg font-semibold mb-4">Support</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="#" className="hover:text-white transition">
-                  Track Order
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white transition">
-                  Return Order
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white transition">
+                <Link to="/shipping-info" className="hover:text-white transition">
                   Shipping Info
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition">
+                <Link to="/return-policy" className="hover:text-white transition">
+                  Return Order
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="hover:text-white transition">
                   Contact Us
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

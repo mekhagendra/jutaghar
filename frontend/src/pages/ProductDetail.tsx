@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { ShoppingCart, Star, TruckIcon, AlertCircle, Trash2 } from 'lucide-react';
+import { ShoppingCart, Star, AlertCircle, Trash2 } from 'lucide-react';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
@@ -245,13 +245,29 @@ const ProductDetail: React.FC = () => {
 
           <div className="mb-6">
             <div className="flex items-baseline gap-4">
-              <span className="text-4xl font-bold text-primary-600">
-                {formatCurrency(displayPrice)}
-              </span>
-              {product.compareAtPrice && (
-                <span className="text-xl text-gray-500 line-through">
-                  {formatCurrency(product.compareAtPrice)}
-                </span>
+              {product.onSale && product.salePrice ? (
+                <>
+                  <span className="text-4xl font-bold text-red-600">
+                    {formatCurrency(product.salePrice)}
+                  </span>
+                  <span className="text-xl text-gray-500 line-through">
+                    {formatCurrency(displayPrice)}
+                  </span>
+                  <span className="text-sm font-semibold text-white bg-red-500 px-2 py-0.5 rounded">
+                    {Math.round(((displayPrice - product.salePrice) / displayPrice) * 100)}% OFF
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-4xl font-bold text-primary-600">
+                    {formatCurrency(displayPrice)}
+                  </span>
+                  {product.compareAtPrice && (
+                    <span className="text-xl text-gray-500 line-through">
+                      {formatCurrency(product.compareAtPrice)}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -387,13 +403,6 @@ const ProductDetail: React.FC = () => {
               <ShoppingCart className="w-5 h-5 mr-2" />
               Add to Cart
             </button>
-          </div>
-
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center text-sm text-gray-600">
-              <TruckIcon className="w-5 h-5 mr-2" />
-              Free shipping on orders over $50
-            </div>
           </div>
         </div>
       </div>

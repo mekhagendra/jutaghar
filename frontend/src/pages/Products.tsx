@@ -38,6 +38,18 @@ const Products: React.FC = () => {
   const vendor = searchParams.get('vendor') || '';
   const minPrice = searchParams.get('minPrice') || '';
   const maxPrice = searchParams.get('maxPrice') || '';
+
+  // Local state for price inputs so users can type freely
+  const [localMinPrice, setLocalMinPrice] = useState(minPrice);
+  const [localMaxPrice, setLocalMaxPrice] = useState(maxPrice);
+
+  // Sync local state when URL params change externally (e.g. clear filters)
+  useEffect(() => {
+    setLocalMinPrice(minPrice);
+  }, [minPrice]);
+  useEffect(() => {
+    setLocalMaxPrice(maxPrice);
+  }, [maxPrice]);
   const size = searchParams.get('size') || '';
   const color = searchParams.get('color') || '';
   const inStock = searchParams.get('inStock') === 'true';
@@ -454,16 +466,20 @@ const Products: React.FC = () => {
                   <input
                     type="number"
                     placeholder="Min"
-                    value={minPrice}
-                    onChange={(e) => updateSearchParams({ minPrice: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    value={localMinPrice}
+                    onChange={(e) => setLocalMinPrice(e.target.value)}
+                    onBlur={() => updateSearchParams({ minPrice: localMinPrice })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') updateSearchParams({ minPrice: localMinPrice }); }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
                   />
                   <span className="text-gray-500">-</span>
                   <input
                     type="number"
                     placeholder="Max"
-                    value={maxPrice}
-                    onChange={(e) => updateSearchParams({ maxPrice: e.target.value })}
+                    value={localMaxPrice}
+                    onChange={(e) => setLocalMaxPrice(e.target.value)}
+                    onBlur={() => updateSearchParams({ maxPrice: localMaxPrice })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') updateSearchParams({ maxPrice: localMaxPrice }); }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
                   />
                 </div>

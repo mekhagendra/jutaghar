@@ -1,273 +1,76 @@
-# JutaGhar Frontend - React + TypeScript + Vite
+# JutaGhar Frontend
 
-Modern, responsive React + TypeScript frontend for the JutaGhar multi-vendor e-commerce platform.
+React + TypeScript + Vite frontend for the JutaGhar multi-vendor e-commerce platform.
 
----
+## Tech Stack
 
-## 📋 Table of Contents
+| Technology | Purpose |
+|---|---|
+| React 18 | UI library |
+| TypeScript | Type safety |
+| Vite | Build tool with HMR |
+| React Router v6 | Client-side routing |
+| Zustand | State management |
+| TanStack Query | Server state & caching |
+| Tailwind CSS | Styling |
+| Axios | HTTP client |
+| React Hook Form + Zod | Form handling & validation |
+| Lucide React | Icons |
 
-1. [Tech Stack](#tech-stack)
-2. [Prerequisites](#prerequisites)
-3. [Getting Started](#getting-started)
-4. [Backend API Connection](#backend-api-connection)
-5. [Environment Configuration](#environment-configuration)
-6. [Development](#development)
-7. [Project Structure](#project-structure)
-8. [Features](#features)
-9. [Available Scripts](#available-scripts)
-10. [Troubleshooting](#troubleshooting)
+## Prerequisites
 
----
+- Node.js v16+
+- Backend API running (see [backend README](../backend/README.md))
 
-## 🚀 Tech Stack
-
-- **React 18** - UI library with hooks and concurrent features
-- **TypeScript** - Type-safe JavaScript superset
-- **Vite 5** - Lightning-fast build tool with HMR
-- **React Router v6** - Client-side routing
-- **Zustand** - Lightweight state management
-- **TanStack Query (React Query)** - Server state management and caching
-- **Tailwind CSS** - Utility-first CSS framework
-- **Axios** - Promise-based HTTP client
-- **React Hook Form** - Performant form handling
-- **Zod** - TypeScript-first schema validation
-- **Lucide React** - Beautiful & consistent icons
-- **React Hot Toast** - Toast notifications
-
----
-
-## 📦 Prerequisites
-
-Before you begin, ensure you have installed:
-
-- **Node.js** (v16 or higher) - [Download](https://nodejs.org/)
-- **npm** or **yarn** - Package manager (comes with Node.js)
-- **Backend API** running - See [Backend Setup](#backend-api-connection)
-
----
-
-## 🏁 Getting Started
-
-### 1. Install Dependencies
+## Getting Started
 
 ```bash
-# Navigate to frontend directory
 cd frontend
-
-# Install dependencies
 npm install
-
-# If you encounter dependency resolution errors:
-npm install --legacy-peer-deps
-
-# Or force installation:
-npm install --force
+npm run dev
 ```
 
-### 2. Configure Environment Variables
+The app runs at `http://localhost:5174`.
 
-Create a `.env` file in the `frontend/` directory:
+### Environment Variables
+
+Create a `.env` file:
 
 ```env
-# API Configuration
 VITE_API_URL=http://localhost:8000/api
-
-# Optional: Enable/Disable Features
-VITE_ENABLE_ANALYTICS=false
-VITE_DEBUG_MODE=true
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
 ```
 
-### 3. Start Development Server
+> In development, Vite proxies `/api/*` requests to `http://localhost:8000` automatically (configured in `vite.config.ts`). `VITE_API_URL` is used in production builds.
 
-```bash
-npm run dev
-```
-
-The application will open at `http://localhost:5174`
-
----
-
-## 🔌 Backend API Connection
-
-### Setting Up the Backend
-
-The frontend requires the backend API to be running. Follow these steps:
-
-#### 1. Navigate to Backend Directory
-
-```bash
-cd ../backend
-```
-
-#### 2. Install Backend Dependencies
-
-```bash
-npm install
-```
-
-#### 3. Configure Backend Environment
-
-Create `.env` file in `backend/` directory:
-
-```env
-PORT=8000
-NODE_ENV=development
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your-super-secret-key-change-this
-JWT_EXPIRE=30d
-CORS_ORIGINS=http://localhost:5173,http://localhost:5174
-```
-
-#### 4. Initialize Database
-
-```bash
-# Create admin user
-node createAdmin.js
-
-# Optional: Seed catalog data
-node seedCatalog.js
-```
-
-#### 5. Start Backend Server
-
-```bash
-# Development mode with auto-reload
-npm run dev
-
-# Production mode
-npm start
-```
-
-Backend API will be available at `http://localhost:8000`
-
-#### 6. Verify Backend Connection
-
-Test the API health endpoint:
-
-```bash
-curl http://localhost:8000/health
-```
-
-Expected response:
-```json
-{
-  "status": "success",
-  "message": "API is running"
-}
-```
-
----
-
-## ⚙️ Environment Configuration
-
-### Development vs Production
-
-The frontend uses **Vite proxy** in development and **direct API calls** in production:
-
-#### Development Mode (Vite Proxy)
-```typescript
-// vite.config.ts automatically proxies /api requests
-server: {
-  proxy: {
-    '/api': {
-      target: 'http://localhost:8000',
-      changeOrigin: true,
-      secure: false,
-    },
-  },
-}
-```
-
-In development, API calls to `/api/*` are automatically proxied to `http://localhost:8000/api/*`
-
-#### Production Mode
-```env
-# .env
-VITE_API_URL=https://your-production-api.com/api
-```
-
-The app uses `VITE_API_URL` environment variable for production builds.
-
-### API Configuration Files
-
-The API client is configured in [src/lib/api.ts](src/lib/api.ts):
-
-```typescript
-// Automatic environment detection
-const API_URL = import.meta.env.MODE === 'development' 
-  ? '' // Use Vite proxy in development
-  : (import.meta.env.VITE_API_URL || 'http://localhost:8000');
-
-// Axios instance with interceptors for auth
-export const api = axios.create({
-  baseURL: API_URL,
-  headers: { 'Content-Type': 'application/json' },
-});
-```
-
-**Features:**
-- ✅ Automatic JWT token injection
-- ✅ Token refresh on 401 errors
-- ✅ Request/Response interceptors
-- ✅ Environment-aware configuration
-
----
-
-## 🛠️ Development
-
-### Running Both Frontend & Backend
-
-**Option 1: Separate Terminals**
-```bash
-# Terminal 1 - Backend
-cd backend
-npm run dev
-
-# Terminal 2 - Frontend
-cd frontend
-npm run dev
-```
-
-**Option 2: Use Process Manager (e.g., concurrently)**
-```bash
-# From root directory
-npm install -g concurrently
-concurrently "cd backend && npm run dev" "cd frontend && npm run dev"
-```
-
-### Hot Module Replacement (HMR)
-
-Vite provides instant HMR. Changes to React components update immediately without full page reload.
-
-### Development Tools
-
-- **React DevTools** - [Chrome](https://chrome.google.com/webstore/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi) | [Firefox](https://addons.mozilla.org/en-US/firefox/addon/react-devtools/)
-- **TanStack Query DevTools** - Built-in, accessible via floating button in dev mode
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 src/
-├── components/          # Reusable React components
-│   ├── layouts/        # Layout wrappers
-│   │   ├── DashboardLayout.tsx
-│   │   └── MainLayout.tsx
+├── components/           # Reusable UI components
 │   ├── Banner.tsx
 │   ├── BrandSlider.tsx
 │   ├── Carousel.tsx
 │   ├── Featured.tsx
 │   ├── Footer.tsx
-│   ├── Header.tsx
 │   ├── Navbar.tsx
 │   ├── NewArrival.tsx
 │   ├── ProductCard.tsx
 │   ├── ProductForm.tsx
 │   ├── ProductSlider.tsx
-│   ├── Sale.tsx
-│   └── Trending.tsx
-├── pages/              # Route-level components
+│   ├── bannerPremium.tsx
+│   ├── bannerPromotion.tsx
+│   ├── bannerSports.tsx
+│   ├── bestSeller.tsx
+│   ├── brands.tsx
+│   ├── category.tsx
+│   ├── hero.tsx
+│   ├── sale.tsx
+│   └── why.tsx
+├── layouts/              # Layout wrappers
+│   ├── MainLayout.tsx
+│   └── dashboard.tsx
+├── pages/                # Route-level pages
 │   ├── Home.tsx
 │   ├── Login.tsx
 │   ├── Register.tsx
@@ -275,326 +78,94 @@ src/
 │   ├── ProductDetail.tsx
 │   ├── Cart.tsx
 │   ├── Checkout.tsx
-│   ├── admin/          # Admin dashboard pages
+│   ├── Outlets.tsx
+│   ├── sale.tsx
+│   ├── AboutUs.tsx
+│   ├── Contact.tsx
+│   ├── PrivacyPolicy.tsx
+│   ├── ReturnPolicy.tsx
+│   ├── ShippingInfo.tsx
+│   ├── admin/            # Admin dashboard
 │   │   ├── Dashboard.tsx
+│   │   ├── DeliverySettings.tsx
 │   │   ├── ManageBrands.tsx
 │   │   ├── ManageCategories.tsx
+│   │   ├── ManageHeroSlides.tsx
 │   │   ├── ManageProducts.tsx
-│   │   ├── ManageUsers.tsx
-│   │   └── ManageVendors.tsx
-│   ├── user/           # Customer dashboard pages
-│   │   └── Dashboard.tsx
-│   └── vendor/         # Vendor dashboard pages
+│   │   └── ManageUsers.tsx
+│   ├── payment/          # Payment callbacks
+│   │   ├── EsewaSuccess.tsx
+│   │   ├── EsewaFailure.tsx
+│   │   └── KhaltiCallback.tsx
+│   ├── user/             # Customer dashboard
+│   │   ├── Dashboard.tsx
+│   │   ├── OrderDetail.tsx
+│   │   ├── Orders.tsx
+│   │   ├── Profile.tsx
+│   │   └── Wishlist.tsx
+│   └── vendor/           # Vendor dashboard
 │       ├── Dashboard.tsx
 │       ├── EditProduct.tsx
 │       ├── ManageInventory.tsx
 │       ├── ManageProducts.tsx
-│       └── NewProduct.tsx
-├── stores/             # Zustand state management
-│   ├── authStore.ts    # Authentication state
-│   └── cartStore.ts    # Shopping cart state
-├── lib/                # Utility libraries
-│   ├── api.ts          # Axios instance & interceptors
-│   └── utils.ts        # Helper functions
-├── types/              # TypeScript type definitions
-│   ├── index.ts        # General types
-│   └── product.ts      # Product-related types
-├── assets/             # Static assets (images, fonts)
-├── App.tsx             # Root component with routing
-├── main.tsx            # Application entry point
-└── index.css           # Global styles & Tailwind imports
+│       ├── NewProduct.tsx
+│       ├── Orders.tsx
+│       └── TaxSettings.tsx
+├── stores/               # Zustand stores
+│   ├── authStore.ts
+│   ├── cartStore.ts
+│   └── wishlistStore.ts
+├── lib/                  # Utilities
+│   ├── api.ts
+│   ├── paymentGateway.ts
+│   └── utils.ts
+├── types/                # TypeScript types
+│   ├── index.ts
+│   └── product.ts
+├── assets/               # Static assets
+├── App.tsx               # Root component & routing
+├── main.tsx              # Entry point
+└── index.css             # Global styles & Tailwind
 ```
 
----
+## Features
 
-## ✨ Features
+- **Auth** — JWT login, Google OAuth, role-based access (Admin / Vendor / User), protected routes
+- **Shopping** — Product search & filtering, brand/category navigation, variants (size, color), cart with persistence, wishlist
+- **Checkout** — eSewa and Khalti payment integration, delivery settings
+- **Admin Dashboard** — Manage users, vendors, products, categories, brands, hero slides, delivery settings
+- **Vendor Dashboard** — Product CRUD, inventory tracking, order management, tax settings
+- **User Dashboard** — Order history, order details, profile, wishlist
+- **UI** — Responsive design, Tailwind CSS, toast notifications, lazy-loaded routes
 
-### Authentication & Authorization
-- 🔐 JWT-based authentication
-- 🔄 Automatic token refresh
-- 👤 Role-based access control (Admin, Vendor, User)
-- 🚪 Protected routes
-
-### Shopping Experience
-- 🛒 Shopping cart with persistence
-- 🔍 Product search & filtering
-- 🏷️ Category and brand navigation
-- 📦 Product variants (size, color)
-- ⭐ Featured & trending products
-
-### Dashboards
-- 👨‍💼 **Admin Dashboard** - User, vendor, product, category, brand management
-- 🏪 **Vendor Dashboard** - Product & inventory management
-- 👤 **User Dashboard** - Order history & account settings
-
-### UI/UX
-- 📱 Fully responsive design
-- 🎨 Modern Tailwind CSS styling
-- ⚡ Fast page transitions
-- 🔔 Toast notifications
-- ♿ Accessible components
-
----
-
-## 📜 Available Scripts
-
-### Development
-```bash
-npm run dev          # Start dev server (localhost:5174)
-```
-
-### Build & Preview
-```bash
-npm run build        # Build for production (outputs to dist/)
-npm run preview      # Preview production build locally
-```
-
-### Code Quality
-```bash
-npm run lint         # Run ESLint
-```
-
-### Type Checking
-```bash
-npx tsc --noEmit     # Check TypeScript types without emitting files
-```
-
-### Type Checking
-```bash
-npx tsc --noEmit     # Check TypeScript types without emitting files
-```
-
----
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### 1. **Backend Connection Refused**
-
-**Problem:** `ERR_CONNECTION_REFUSED` when calling API
-
-**Solutions:**
-```bash
-# Verify backend is running
-curl http://localhost:8000/health
-
-# Check backend port in .env matches vite.config.ts proxy
-# Backend .env: PORT=8000
-# Frontend vite.config.ts: target: 'http://localhost:8000'
-
-# Verify CORS configuration in backend .env
-CORS_ORIGINS=http://localhost:5173,http://localhost:5174
-```
-
-#### 2. **401 Unauthorized Errors**
-
-**Problem:** Getting 401 errors on authenticated requests
-
-**Solutions:**
-- Check if JWT token is stored in localStorage
-- Verify token hasn't expired (default: 30 days)
-- Clear localStorage and login again:
-  ```javascript
-  // In browser console
-  localStorage.clear()
-  ```
-
-#### 3. **Dependency Installation Errors**
-
-**Problem:** `npm install` fails with peer dependency conflicts
-
-**Solutions:**
-```bash
-# Use legacy peer deps
-npm install --legacy-peer-deps
-
-# Or force install
-npm install --force
-
-# Clear cache if issues persist
-npm cache clean --force
-rm -rf node_modules package-lock.json
-npm install --legacy-peer-deps
-```
-
-#### 4. **Port Already in Use**
-
-**Problem:** `Port 5174 is already in use`
-
-**Solutions:**
-```bash
-# Find and kill process on port 5174 (macOS/Linux)
-lsof -ti:5174 | xargs kill -9
-
-# Or change port in vite.config.ts
-server: {
-  port: 5175, // Use different port
-}
-```
-
-#### 5. **Environment Variables Not Loading**
-
-**Problem:** `import.meta.env.VITE_API_URL` is undefined
-
-**Solutions:**
-- Ensure `.env` file is in frontend root directory
-- All env vars must start with `VITE_` prefix
-- Restart dev server after changing `.env`:
-  ```bash
-  # Stop server (Ctrl+C) and restart
-  npm run dev
-  ```
-
-#### 6. **Vite Proxy Not Working**
-
-**Problem:** API calls are not being proxied
-
-**Solutions:**
-- Verify proxy configuration in `vite.config.ts`
-- Ensure API calls use relative path `/api/*` not full URL
-- Check backend is running on correct port
-- Restart Vite dev server
-
-#### 7. **Module Not Found Errors**
-
-**Problem:** TypeScript can't find modules or types
-
-**Solutions:**
-```bash
-# Reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
-
-# Check path aliases in tsconfig.json
-{
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  }
-}
-```
-
----
-
-## 🔗 API Endpoints Reference
-
-### Base URL
-- **Development:** `http://localhost:8000/api`
-- **Production:** Set via `VITE_API_URL` environment variable
-
-### Main Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/auth/register` | Register new user |
-| POST | `/auth/login` | User login |
-| POST | `/auth/refresh` | Refresh JWT token |
-| GET | `/products` | List all products |
-| GET | `/products/:id` | Get product details |
-| POST | `/products` | Create product (Vendor/Admin) |
-| PUT | `/products/:id` | Update product (Vendor/Admin) |
-| DELETE | `/products/:id` | Delete product (Vendor/Admin) |
-| GET | `/catalog/categories` | Get all categories |
-| GET | `/catalog/brands` | Get all brands |
-| POST | `/orders` | Create order |
-| GET | `/orders/my-orders` | Get user orders |
-| GET | `/admin/users` | List users (Admin) |
-| GET | `/admin/stats` | Dashboard stats (Admin) |
-| GET | `/vendors/products` | Vendor products |
-
-For complete API documentation, see [Backend README](../backend/README.md)
-
----
-
-## 🚀 Deployment
-
-### Build for Production
+## Scripts
 
 ```bash
-# Create optimized production build
-npm run build
-
-# Output directory: dist/
+npm run dev       # Start dev server
+npm run build     # Production build (outputs to dist/)
+npm run preview   # Preview production build
+npm run lint      # Run ESLint
+npx tsc --noEmit  # Type-check without emitting
 ```
 
-### Environment Variables for Production
+## Troubleshooting
 
-```env
-# Production API URL
-VITE_API_URL=https://api.yourdomain.com/api
+| Problem | Solution |
+|---|---|
+| `ERR_CONNECTION_REFUSED` | Ensure backend is running: `curl http://localhost:8000/health` |
+| 401 errors | Clear localStorage and re-login |
+| `npm install` fails | Try `npm install --legacy-peer-deps` |
+| Port in use | `lsof -ti:5174 \| xargs kill -9` |
+| Env vars undefined | Prefix with `VITE_`, restart dev server |
+| Proxy not working | Use relative paths (`/api/*`), check `vite.config.ts` |
 
-# Optional production flags
-VITE_ENABLE_ANALYTICS=true
-VITE_DEBUG_MODE=false
-```
-
-### Deploy to Vercel
+## Deployment
 
 ```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Deploy
-vercel
-
-# Set environment variables in Vercel dashboard
-# Project Settings > Environment Variables > Add VITE_API_URL
+npm run build  # Outputs to dist/
 ```
 
-### Deploy to Netlify
-
-```bash
-# Build command
-npm run build
-
-# Publish directory
-dist
-
-# Environment variables
-# Site Settings > Build & Deploy > Environment > Add VITE_API_URL
-```
-
-### Deploy to AWS S3 + CloudFront
-
-```bash
-# Build project
-npm run build
-
-# Upload to S3
-aws s3 sync dist/ s3://your-bucket-name --delete
-
-# Invalidate CloudFront cache
-aws cloudfront create-invalidation --distribution-id YOUR_DIST_ID --paths "/*"
-```
-
----
-
-## 📚 Additional Resources
-
-### Documentation
-- [React Documentation](https://react.dev/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [Vite Documentation](https://vitejs.dev/)
-- [React Router v6](https://reactrouter.com/)
-- [Zustand Documentation](https://docs.pmnd.rs/zustand/)
-- [TanStack Query](https://tanstack.com/query/latest)
-- [Tailwind CSS](https://tailwindcss.com/docs)
-
-### Backend Repository
-- See [Backend README](../backend/README.md) for API documentation
-- Backend source: [../backend](../backend/)
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/new-feature`
-3. Commit changes: `git commit -m 'Add new feature'`
-4. Push to branch: `git push origin feature/new-feature`
-5. Submit pull request
+Set `VITE_API_URL` to your production API URL before building.
 
 ---
 

@@ -14,6 +14,12 @@ const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 const Cart = lazy(() => import('@/pages/Cart'));
 const Checkout = lazy(() => import('@/pages/Checkout'));
 const Outlets = lazy(() => import('@/pages/Outlets'));
+const Sale = lazy(() => import('@/pages/sale'));
+const AboutUs = lazy(() => import('@/pages/AboutUs'));
+const ReturnPolicy = lazy(() => import('@/pages/ReturnPolicy'));
+const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
+const Contact = lazy(() => import('@/pages/Contact'));
+const ShippingInfo = lazy(() => import('@/pages/ShippingInfo'));
 
 // Payment callback pages
 const EsewaSuccess = lazy(() => import('@/pages/payment/EsewaSuccess'));
@@ -92,11 +98,20 @@ const ProductsWrapper: React.FC = () => {
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ScrollToTop />
         <Toaster position="top-right" />
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900" /></div>}>
         <Routes>
@@ -108,6 +123,12 @@ function App() {
             <Route path="/products" element={<ProductsWrapper />} />
             <Route path="/products/:id" element={<ProductDetail />} />
             <Route path="/outlets" element={<Outlets />} />
+            <Route path="/sale" element={<Sale />} />
+            <Route path="/about-us" element={<AboutUs />} />
+            <Route path="/return-policy" element={<ReturnPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/shipping-info" element={<ShippingInfo />} />
             
             {/* Payment callback routes */}
             <Route path="/payment/esewa/success" element={<EsewaSuccess />} />
