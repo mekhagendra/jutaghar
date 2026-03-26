@@ -23,13 +23,8 @@ export const createOrder = async (req, res) => {
 
     const { items, paymentMethod, shippingAddress, notes } = req.body;
 
-    // Get user to determine order type
+    // Get user
     const user = await User.findById(req.user._id);
-    
-    // Determine order type: B2B if user is a seller buying from manufacturers/importers
-    // B2C for regular customers or sellers selling to customers
-    let orderType = 'B2C';
-    let isBuyerSeller = user.role === 'seller';
 
     // Validate and process items
     const orderItems = [];
@@ -37,7 +32,6 @@ export const createOrder = async (req, res) => {
 
     for (const item of items) {
       const product = await Product.findById(item.product)
-        .populate('vendor', 'role')
         .session(session);
       
       if (!product) {
@@ -99,37 +93,8 @@ export const createOrder = async (req, res) => {
         }
       }
 
-      // Check wholesale product access
-      if (product.isWholesaleOnly) {
-        // Only sellers can purchase wholesale products
-        if (req.user.role !== 'seller') {
-          await session.abortTransaction();
-          return res.status(403).json({
-            success: false,
-            message: `Product ${product.name} is only available for wholesale purchase by registered sellers`
-          });
-        }
-
-        // Check minimum wholesale quantity
-        if (item.quantity < product.minWholesaleQuantity) {
-          await session.abortTransaction();
-          return res.status(400).json({
-            success: false,
-            message: `Minimum wholesale quantity for ${product.name} is ${product.minWholesaleQuantity} units`
-          });
-        }
-      }
-
-      // Use wholesale price for sellers, retail price for others
+      // Determine price
       let itemPrice = selectedVariant?.price || product.price;
-      if (isBuyerSeller && product.wholesalePrice) {
-        itemPrice = product.wholesalePrice;
-        // This is a B2B order (seller buying from manufacturer/importer)
-        if (product.vendor.role === 'manufacturer' || 
-            product.vendor.role === 'importer') {
-          orderType = 'B2B';
-        }
-      }
 
       const itemTotal = itemPrice * item.quantity;
       subtotal += itemTotal;
@@ -174,7 +139,6 @@ export const createOrder = async (req, res) => {
     const order = new Order({
       orderNumber,
       user: req.user._id,
-      orderType,
       items: orderItems,
       subtotal,
       tax: taxDisplay,

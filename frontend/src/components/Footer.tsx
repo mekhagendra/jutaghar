@@ -11,8 +11,8 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="text-white text-lg font-semibold mb-4">JutaGhar</h3>
             <p className="text-sm">
-              Nepal's leading multi-vendor B2B and B2C e-commerce platform connecting
-              manufacturers, importers, sellers, and customers.
+              Nepal's leading e-commerce platform for footwear connecting
+              outlets and customers.
             </p>
           </div>
 

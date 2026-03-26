@@ -2,7 +2,6 @@ import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
 import TaxSettings from '../models/TaxSettings.js';
-import bcrypt from 'bcryptjs';
 
 // Get vendor statistics
 export const getVendorStats = async (req, res) => {
@@ -198,33 +197,26 @@ export const getProductsSummary = async (req, res) => {
   }
 };
 
-// Get vendor dashboard with B2B and B2C stats
+// Get vendor dashboard
 export const getVendorDashboard = async (req, res) => {
   try {
     const vendorId = req.user._id;
     const user = await User.findById(vendorId);
 
-    if (!user || user.role !== 'vendor') {
+    if (!user || user.role !== 'outlet') {
       return res.status(403).json({ 
         success: false,
-        message: 'Access denied. Vendor role required.' 
+        message: 'Access denied. Outlet role required.' 
       });
     }
 
     // Get products count
     const productsCount = await Product.countDocuments({ vendor: vendorId });
 
-    // Get B2C sales orders (vendor selling to customers)
+    // Get sales orders
     const salesOrders = await Order.find({
       'items.vendor': vendorId,
-      orderType: 'B2C'
     });
-
-    // Get B2B purchase orders (seller buying from manufacturers/importers)
-    const purchaseOrders = user.role === 'seller' ? await Order.find({
-      user: vendorId,
-      orderType: 'B2B'
-    }) : [];
 
     // Calculate sales revenue
     const totalSales = salesOrders.reduce((sum, order) => {
@@ -235,15 +227,6 @@ export const getVendorDashboard = async (req, res) => {
         itemSum + (item.price * item.quantity), 0
       );
     }, 0);
-
-    // Calculate purchase costs (for sellers)
-    const totalPurchases = purchaseOrders.reduce((sum, order) => sum + order.total, 0);
-
-    // Get sellers under this vendor (if manufacturer or importer)
-    const sellers = user.role !== 'seller' ? await User.find({
-      parentVendor: vendorId,
-      role: 'seller'
-    }).select('fullName email businessName status') : [];
 
     res.json({
       success: true,
@@ -258,230 +241,7 @@ export const getVendorDashboard = async (req, res) => {
           productsCount,
           totalSalesOrders: salesOrders.length,
           totalSales,
-          totalPurchaseOrders: purchaseOrders.length,
-          totalPurchases,
-          sellersCount: sellers.length
         },
-        sellers: sellers.length > 0 ? sellers : undefined
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Get seller's purchase orders from manufacturers/importers
-export const getSellerPurchases = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const user = await User.findById(userId);
-
-    if (!user || user.role !== 'seller') {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Access denied. Seller role required.' 
-      });
-    }
-
-    const { page = 1, limit = 10, status } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const query = {
-      user: userId,
-      orderType: 'B2B'
-    };
-
-    if (status) query.status = status;
-
-    const [orders, total] = await Promise.all([
-      Order.find(query)
-        .populate('items.vendor', 'businessName role email')
-        .populate('items.product', 'name images')
-        .sort('-createdAt')
-        .skip(skip)
-        .limit(parseInt(limit)),
-      Order.countDocuments(query)
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        orders,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Get sellers under vendor (for manufacturers/importers)
-export const getVendorSellers = async (req, res) => {
-  try {
-    const vendorId = req.user._id;
-    const user = await User.findById(vendorId);
-
-    if (!user || !['manufacturer', 'importer', 'seller', 'outlet'].includes(user.role)) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Access denied. Vendor role required.' 
-      });
-    }
-
-    if (['seller', 'outlet'].includes(user.role)) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Sellers and outlets cannot have sub-sellers.' 
-      });
-    }
-
-    const sellers = await User.find({
-      parentVendor: vendorId,
-      role: 'seller'
-    }).select('-password -refreshToken');
-
-    res.json({
-      success: true,
-      data: { sellers }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Create seller under vendor (for manufacturers/importers)
-export const createSeller = async (req, res) => {
-  try {
-    const vendorId = req.user._id;
-    const vendor = await User.findById(vendorId);
-
-    if (!vendor || !['manufacturer', 'importer'].includes(vendor.role)) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Access denied. Manufacturer or Importer role required.' 
-      });
-    }
-
-    const { 
-      email, 
-      password, 
-      fullName, 
-      phone, 
-      businessName, 
-      businessAddress 
-    } = req.body;
-
-    // Validate required fields
-    if (!email || !password || !fullName || !phone || !businessName) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Please provide all required fields: email, password, fullName, phone, businessName' 
-      });
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Email already registered' 
-      });
-    }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create seller
-    const seller = new User({
-      email,
-      password: hashedPassword,
-      fullName,
-      phone,
-      role: 'seller',
-      businessName,
-      businessAddress,
-      parentVendor: vendorId,
-      status: 'active' // Auto-approve sellers created by verified vendors
-    });
-
-    await seller.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Seller created successfully',
-      data: {
-        seller: {
-          id: seller._id,
-          email: seller.email,
-          fullName: seller.fullName,
-          businessName: seller.businessName,
-          status: seller.status
-        }
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Update seller status (for manufacturers/importers)
-export const updateSellerStatus = async (req, res) => {
-  try {
-    const vendorId = req.user._id;
-    const { sellerId } = req.params;
-    const { status } = req.body;
-
-    if (!['active', 'suspended'].includes(status)) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Invalid status. Must be active or suspended.' 
-      });
-    }
-
-    const seller = await User.findOne({
-      _id: sellerId,
-      parentVendor: vendorId,
-      role: 'seller'
-    });
-
-    if (!seller) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Seller not found or not under your management' 
-      });
-    }
-
-    seller.status = status;
-    await seller.save();
-
-    res.json({
-      success: true,
-      message: `Seller ${status === 'active' ? 'activated' : 'suspended'} successfully`,
-      data: {
-        seller: {
-          id: seller._id,
-          email: seller.email,
-          fullName: seller.fullName,
-          status: seller.status
-        }
       }
     });
   } catch (error) {

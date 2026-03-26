@@ -41,6 +41,7 @@ const Navbar: React.FC = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openMobileDropdown, setOpenMobileDropdown] = useState<string | null>(null);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [menCategories, setMenCategories] = useState<Category[]>([]);
   const [womenCategories, setWomenCategories] = useState<Category[]>([]);
   const [kidsCategories, setKidsCategories] = useState<Category[]>([]);
@@ -144,23 +145,27 @@ const Navbar: React.FC = () => {
     const fetchCategories = async () => {
       try {
         // Fetch categories for each gender with inventory
-        const [menRes, womenRes, kidsRes] = await Promise.all([
+        const [allRes, menRes, womenRes, kidsRes] = await Promise.all([
+          api.get('/api/catalog/categories?withInventory=true'),
           api.get('/api/catalog/categories?withInventory=true&gender=men'),
           api.get('/api/catalog/categories?withInventory=true&gender=women'),
           api.get('/api/catalog/categories?withInventory=true&gender=kids'),
         ]);
 
         // Extract categories that have productCount > 0
+        const allCats = (allRes.data.data || []).filter((cat: Category) => cat.productCount && cat.productCount > 0);
         const menCats = (menRes.data.data || []).filter((cat: Category) => cat.productCount && cat.productCount > 0);
         const womenCats = (womenRes.data.data || []).filter((cat: Category) => cat.productCount && cat.productCount > 0);
         const kidsCats = (kidsRes.data.data || []).filter((cat: Category) => cat.productCount && cat.productCount > 0);
 
         console.log('📦 Categories with inventory loaded:', {
+          all: allCats.length,
           men: menCats.length,
           women: womenCats.length,
           kids: kidsCats.length
         });
 
+        setAllCategories(allCats);
         setMenCategories(menCats);
         setWomenCategories(womenCats);
         setKidsCategories(kidsCats);
@@ -195,6 +200,17 @@ const Navbar: React.FC = () => {
 
     return [
       {
+        label: 'Products',
+        path: '/products',
+        submenu: [
+          { label: 'All Products', path: '/products' },
+          ...allCategories.map(cat => ({
+            label: cat.name,
+            path: `/products?category=${cat.name}`
+          })),
+        ],
+      },
+      {
         label: 'Men',
         path: '/products?gender=Men',
         submenu: createSubmenu('Men', menCategories),
@@ -214,12 +230,12 @@ const Navbar: React.FC = () => {
       { label: 'Sale', path: '/sale' },
       { label: 'Outlets', path: '/outlets' },
     ];
-  }, [menCategories, womenCategories, kidsCategories]);
+  }, [allCategories, menCategories, womenCategories, kidsCategories]);
 
   const getDashboardPath = () => {
     if (!user) return '/login';
     if (['admin', 'manager'].includes(user.role)) return '/admin/dashboard';
-    if (['manufacturer', 'importer', 'seller', 'outlet'].includes(user.role)) return '/vendor/dashboard';
+    if (['outlet'].includes(user.role)) return '/vendor/dashboard';
     return '/dashboard';
   };
 

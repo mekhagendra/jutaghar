@@ -15,7 +15,6 @@ interface Product {
   price: number;
   onSale?: boolean;
   salePrice?: number;
-  wholesalePrice?: number;
   stock: number;
   status: string;
 }
@@ -161,12 +160,8 @@ const ManageProducts: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <div>
-                        <p className="font-medium">{formatCurrency(product.price)}</p>
-                        {product.wholesalePrice && (
-                          <p className="text-sm text-gray-600">
-                            Wholesale: {formatCurrency(product.wholesalePrice)}
-                          </p>
-                        )}
+                        <p className="font-medium">{formatCurrency(product.price)}
+                        </p>
                       </div>
                     </td>
                     <td className="py-3 px-4">

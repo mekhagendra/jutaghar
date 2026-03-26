@@ -177,7 +177,7 @@ function App() {
           {/* Vendor routes */}
           <Route
             element={
-              <ProtectedRoute allowedRoles={['manufacturer', 'importer', 'seller', 'outlet', 'admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['outlet', 'admin', 'manager']}>
                 <DashboardLayout />
               </ProtectedRoute>
             }

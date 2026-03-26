@@ -27,21 +27,7 @@ const productSchema = new mongoose.Schema({
     type: Number,
     min: 0
   },
-  // Wholesale pricing for manufacturers/importers
-  wholesalePrice: {
-    type: Number,
-    min: 0
-  },
-  minWholesaleQuantity: {
-    type: Number,
-    default: 1,
-    min: 1
-  },
-  // Product visibility control
-  isWholesaleOnly: {
-    type: Boolean,
-    default: false
-  },
+
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',

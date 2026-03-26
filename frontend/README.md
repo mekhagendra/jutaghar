@@ -239,7 +239,7 @@ Modern, responsive React + TypeScript frontend for JutaGhar footwear marketplace
 
 ## 🎯 Overview
 
-A complete multi-vendor B2B/B2C e-commerce platform specifically designed for footwear retail with:
+A complete multi-vendor e-commerce platform specifically designed for footwear retail with:
 - **8 Homepage Sections** (Hero, Promotion, New Arrivals, Banners, Best Sellers, Featured, Brands, Categories)
 - **Advanced Product Attributes** (Variants, Materials, Performance features, Kids-specific attributes)
 - **Faceted Search & Filtering** (Gender, Size, Color, Brand, Price, Material, etc.)

@@ -49,11 +49,6 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  orderType: {
-    type: String,
-    enum: ['B2C', 'B2B'], // B2C: seller to customer, B2B: vendor to seller
-    default: 'B2C'
-  },
   items: [orderItemSchema],
   subtotal: {
     type: Number,

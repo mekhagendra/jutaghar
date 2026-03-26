@@ -15,7 +15,6 @@ export const getProducts = async (req, res) => {
       maxPrice,
       search,
       sort,
-      wholesaleOnly = false,
       status
     } = req.query;
 
@@ -41,16 +40,6 @@ export const getProducts = async (req, res) => {
       query.status = 'active';
     } else if (status) {
       query.status = status;
-    }
-
-    // Filter wholesale-only products based on user type
-    if (wholesaleOnly === 'true') {
-      query.isWholesaleOnly = true;
-    } else {
-      // Hide wholesale-only products from regular customers
-      if (!req.user || req.user.role === 'user') {
-        query.isWholesaleOnly = { $ne: true };
-      }
     }
 
     // Apply filters
@@ -108,23 +97,10 @@ export const getProducts = async (req, res) => {
       Product.countDocuments(query)
     ]);
 
-    // Filter wholesale price visibility
-    const filteredProducts = products.map(product => {
-      const productObj = product.toObject();
-      
-      // Only show wholesale price to sellers
-      if (!req.user || req.user.role !== 'seller') {
-        delete productObj.wholesalePrice;
-        delete productObj.minWholesaleQuantity;
-      }
-      
-      return productObj;
-    });
-
     res.json({
       success: true,
       data: {
-        products: filteredProducts,
+        products,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -160,17 +136,9 @@ export const getProductById = async (req, res) => {
     product.views += 1;
     await product.save();
 
-    const productObj = product.toObject();
-    
-    // Only show wholesale price to sellers
-    if (!req.user || req.user.role !== 'seller') {
-      delete productObj.wholesalePrice;
-      delete productObj.minWholesaleQuantity;
-    }
-
     res.json({
       success: true,
-      data: productObj
+      data: product
     });
   } catch (error) {
     res.status(500).json({
@@ -198,31 +166,6 @@ export const createProduct = async (req, res) => {
 
     // Save base64 images to upload directory
     processProductImages(productData);
-
-    // Validate wholesale pricing based on role
-    if (req.user.role === 'manufacturer' || req.user.role === 'importer') {
-      // Manufacturers and importers MUST provide wholesale pricing
-      if (!productData.wholesalePrice) {
-        return res.status(400).json({
-          success: false,
-          message: 'Wholesale price is required for manufacturers and importers'
-        });
-      }
-      
-      // Ensure wholesale price is less than retail price
-      if (productData.wholesalePrice >= productData.price) {
-        return res.status(400).json({
-          success: false,
-          message: 'Wholesale price must be less than retail price'
-        });
-      }
-    } else if (req.user.role === 'seller') {
-      // Sellers CAN add products but only for retail (no wholesale pricing)
-      // This represents their own inventory that they won't sell wholesale
-      delete productData.wholesalePrice;
-      delete productData.minWholesaleQuantity;
-      delete productData.isWholesaleOnly;
-    }
 
     // Set status to active by default for vendors
     if (!productData.status) {
@@ -332,80 +275,6 @@ export const getVendorProducts = async (req, res) => {
         .populate('category', 'name')
         .populate('brand', 'name')
         .sort('-createdAt')
-        .skip(skip)
-        .limit(parseInt(limit)),
-      Product.countDocuments(query)
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        products,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// Get wholesale products (only for sellers)
-export const getWholesaleProducts = async (req, res) => {
-  try {
-    // Check if user is a seller
-    if (req.user.role !== 'seller') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only registered sellers can view wholesale products.'
-      });
-    }
-
-    const { 
-      page = 1, 
-      limit = 20, 
-      category, 
-      vendor,
-      gender,
-      minPrice,
-      maxPrice,
-      search,
-      sort = '-createdAt'
-    } = req.query;
-
-    const query = { 
-      status: 'active',
-      wholesalePrice: { $exists: true, $ne: null }
-    };
-
-    // Apply filters
-    if (category) query.category = category;
-    if (vendor) query.vendor = vendor;
-    if (gender) query.gender = gender;
-    if (minPrice || maxPrice) {
-      query.wholesalePrice = {};
-      if (minPrice) query.wholesalePrice.$gte = parseFloat(minPrice);
-      if (maxPrice) query.wholesalePrice.$lte = parseFloat(maxPrice);
-    }
-    if (search) {
-      query.$text = { $search: search };
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const [products, total] = await Promise.all([
-      Product.find(query)
-        .populate('vendor', 'businessName fullName role email phone')
-        .populate('category', 'name')
-        .populate('brand', 'name')
-        .sort(sort)
         .skip(skip)
         .limit(parseInt(limit)),
       Product.countDocuments(query)

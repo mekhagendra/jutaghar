@@ -117,7 +117,7 @@ export const updateUserRole = async (req, res) => {
   try {
     const { role } = req.body;
 
-    if (!['admin', 'manufacturer', 'importer', 'seller', 'outlet', 'user'].includes(role)) {
+    if (!['admin', 'outlet', 'user'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role'
@@ -153,7 +153,7 @@ export const updateUserRole = async (req, res) => {
 export const getPendingVendors = async (req, res) => {
   try {
     const vendors = await User.find({
-      role: { $in: ['manufacturer', 'importer', 'seller', 'outlet'] },
+      role: 'outlet',
       status: 'pending'
     }).select('-password -refreshToken').sort('-createdAt');
 
@@ -174,7 +174,7 @@ export const getAllVendors = async (req, res) => {
   try {
     const { isApproved, isActive } = req.query;
     
-    const query = { role: { $in: ['manufacturer', 'importer', 'seller', 'outlet'] } };
+    const query = { role: 'outlet' };
     
     if (isApproved !== undefined) {
       query.status = isApproved === 'true' ? 'active' : 'pending';
@@ -229,10 +229,10 @@ export const updateVendorStatus = async (req, res) => {
       });
     }
 
-    if (!['manufacturer', 'importer', 'seller', 'outlet'].includes(vendor.role)) {
+    if (vendor.role !== 'outlet') {
       return res.status(400).json({
         success: false,
-        message: 'User is not a vendor (manufacturer/importer/seller/outlet)'
+        message: 'User is not an outlet'
       });
     }
 
@@ -264,10 +264,10 @@ export const approveVendor = async (req, res) => {
       });
     }
 
-    if (!['manufacturer', 'importer', 'seller', 'outlet'].includes(vendor.role)) {
+    if (vendor.role !== 'outlet') {
       return res.status(400).json({
         success: false,
-        message: 'User is not a vendor (manufacturer/importer/seller/outlet)'
+        message: 'User is not an outlet'
       });
     }
 
@@ -303,10 +303,10 @@ export const rejectVendor = async (req, res) => {
       });
     }
 
-    if (!['manufacturer', 'importer', 'seller', 'outlet'].includes(vendor.role)) {
+    if (vendor.role !== 'outlet') {
       return res.status(400).json({
         success: false,
-        message: 'User is not a vendor (manufacturer/importer/seller/outlet)'
+        message: 'User is not an outlet'
       });
     }
 
@@ -332,19 +332,9 @@ export const getAdminStats = async (req, res) => {
     const [
       totalUsers,
       activeUsers,
-      totalVendors,
-      pendingVendors,
-      // Vendor types
-      totalManufacturers,
-      activeManufacturers,
-      pendingManufacturers,
-      totalImporters,
-      activeImporters,
-      pendingImporters,
-      totalSellers,
-      activeSellers,
-      pendingSellers,
-      // Products and Orders
+      totalOutlets,
+      activeOutlets,
+      pendingOutlets,
       totalProducts,
       activeProducts,
       totalOrders,
@@ -353,21 +343,9 @@ export const getAdminStats = async (req, res) => {
     ] = await Promise.all([
       User.countDocuments({ role: 'user' }),
       User.countDocuments({ role: 'user', status: 'active' }),
-      User.countDocuments({ role: { $in: ['manufacturer', 'importer', 'seller', 'outlet'] } }),
-      User.countDocuments({ role: { $in: ['manufacturer', 'importer', 'seller', 'outlet'] }, status: 'pending' }),
-      // Manufacturers
-      User.countDocuments({ role: 'manufacturer' }),
-      User.countDocuments({ role: 'manufacturer', status: 'active' }),
-      User.countDocuments({ role: 'manufacturer', status: 'pending' }),
-      // Importers
-      User.countDocuments({ role: 'importer' }),
-      User.countDocuments({ role: 'importer', status: 'active' }),
-      User.countDocuments({ role: 'importer', status: 'pending' }),
-      // Sellers
-      User.countDocuments({ role: 'seller' }),
-      User.countDocuments({ role: 'seller', status: 'active' }),
-      User.countDocuments({ role: 'seller', status: 'pending' }),
-      // Products and Orders
+      User.countDocuments({ role: 'outlet' }),
+      User.countDocuments({ role: 'outlet', status: 'active' }),
+      User.countDocuments({ role: 'outlet', status: 'pending' }),
       Product.countDocuments(),
       Product.countDocuments({ status: 'active' }),
       Order.countDocuments(),
@@ -392,24 +370,10 @@ export const getAdminStats = async (req, res) => {
           total: totalUsers,
           active: activeUsers
         },
-        vendors: {
-          total: totalVendors,
-          pending: pendingVendors
-        },
-        manufacturers: {
-          total: totalManufacturers,
-          active: activeManufacturers,
-          pending: pendingManufacturers
-        },
-        importers: {
-          total: totalImporters,
-          active: activeImporters,
-          pending: pendingImporters
-        },
-        sellers: {
-          total: totalSellers,
-          active: activeSellers,
-          pending: pendingSellers
+        outlets: {
+          total: totalOutlets,
+          active: activeOutlets,
+          pending: pendingOutlets
         },
         products: {
           total: totalProducts,

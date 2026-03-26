@@ -7,7 +7,6 @@ import Sale from '@/components/sale';
 import Brands from '@/components/brands';
 import BestSeller from '@/components/bestSeller';
 import Category from '@/components/category';
-import BannerPromotion from '@/components/bannerPromotion';
 import BannerPremium from '@/components/bannerPremium';
 import BannerSports from '@/components/bannerSports';
 
@@ -16,7 +15,7 @@ const Home: React.FC = () => {
     <div className="min-h-screen">
       <Hero />
 
-      <BannerPromotion />
+      {/* <BannerPromotion /> */}
 
       <Featured />
 

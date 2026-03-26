@@ -47,7 +47,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'manager', 'manufacturer', 'importer', 'seller', 'outlet', 'user'],
+    enum: ['admin', 'manager', 'outlet', 'user'],
     default: 'user'
   },
   status: {
@@ -60,17 +60,11 @@ const userSchema = new mongoose.Schema({
     default: true
   },
   
-  // Vendor-specific fields (for manufacturer, importer, seller, outlet roles)
+  // Vendor-specific fields (for outlet role)
   businessName: String,
   businessLicense: String,
   businessAddress: String,
   taxId: String,
-  
-  // Parent vendor relationship (for sellers under a vendor)
-  parentVendor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
   
   // User affiliation data
   affiliations: [affiliationSchema],
@@ -79,16 +73,12 @@ const userSchema = new mongoose.Schema({
     ref: 'User'
   },
   
-  // Vendor request (user requests to become vendor from profile)
+  // Vendor request (user requests to become an outlet from profile)
   vendorRequest: {
     status: {
       type: String,
       enum: ['none', 'pending', 'approved', 'rejected'],
       default: 'none'
-    },
-    type: {
-      type: String,
-      enum: ['manufacturer', 'importer', 'seller']
     },
     businessName: String,
     businessAddress: String,

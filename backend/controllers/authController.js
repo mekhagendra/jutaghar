@@ -124,7 +124,7 @@ export const login = async (req, res) => {
       });
     }
 
-    if (user.status === 'pending' && ['manufacturer', 'importer', 'seller', 'outlet'].includes(user.role)) {
+    if (user.status === 'pending' && user.role === 'outlet') {
       return res.status(403).json({
         success: false,
         message: 'Account is pending approval'
@@ -305,7 +305,7 @@ export const googleLogin = async (req, res) => {
       });
     }
 
-    if (user.status === 'pending' && ['manufacturer', 'importer', 'seller', 'outlet'].includes(user.role)) {
+    if (user.status === 'pending' && user.role === 'outlet') {
       return res.status(403).json({
         success: false,
         message: 'Account is pending approval'
@@ -343,17 +343,10 @@ export const googleLogin = async (req, res) => {
   }
 };
 
-// Request vendor status (user requests to become a vendor from profile)
+// Request vendor status (user requests to become an outlet from profile)
 export const requestVendor = async (req, res) => {
   try {
-    const { type, businessName, businessAddress, taxId } = req.body;
-
-    if (!['manufacturer', 'importer', 'seller'].includes(type)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid vendor type. Must be manufacturer, importer, or seller.'
-      });
-    }
+    const { businessName, businessAddress, taxId } = req.body;
 
     if (!businessName || !businessName.trim()) {
       return res.status(400).json({
@@ -385,7 +378,6 @@ export const requestVendor = async (req, res) => {
 
     user.vendorRequest = {
       status: 'pending',
-      type,
       businessName: businessName.trim(),
       businessAddress: businessAddress?.trim() || '',
       taxId: taxId?.trim() || '',

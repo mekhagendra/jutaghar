@@ -62,7 +62,7 @@ type PortalType = 'admin' | 'vendor' | 'customer';
 const getPortalType = (role: UserRole | undefined): PortalType => {
   if (role === 'admin' || role === 'manager') return 'admin';
   if (role === 'user' || !role) return 'customer';
-  return 'vendor'; // manufacturer, importer, seller
+  return 'vendor'; // outlet
 };
 
 interface PortalConfig {
@@ -141,7 +141,7 @@ const DashboardLayout: React.FC = () => {
 
   const displaySub =
     portalType === 'vendor'
-      ? (user?.businessType ?? user?.role ?? '')
+      ? (user?.role ?? '')
       : portalType === 'admin'
       ? (user?.role ?? '')
       : (user?.email ?? '');

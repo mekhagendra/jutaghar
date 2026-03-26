@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ShoppingCart, Package } from 'lucide-react';
+import { Heart, ShoppingCart } from 'lucide-react';
 import { Product } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/stores/cartStore';
-import { useAuthStore } from '@/stores/authStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 
 interface ProductCardProps {
@@ -14,7 +13,6 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
   const { addItem } = useCartStore();
-  const { user } = useAuthStore();
   const { toggleItem, isInWishlist } = useWishlistStore();
   const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -31,12 +29,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
     ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
     : 0;
 
-  // Check if user is a seller who can see wholesale prices
-  const isSeller = user?.role === 'seller' || user?.businessType === 'seller';
-  const hasWholesalePrice = product.wholesalePrice && product.wholesalePrice > 0;
-  const wholesaleSavings = hasWholesalePrice && product.wholesalePrice 
-    ? Math.round(((product.price - product.wholesalePrice) / product.price) * 100)
-    : 0;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -84,12 +76,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
 
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
-          {product.isWholesaleOnly && (
-            <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-500 text-white flex items-center gap-1">
-              <Package className="w-3 h-3" />
-              Wholesale Only
-            </span>
-          )}
           {isNew && (
             <span className="px-2 py-1 text-xs font-semibold rounded bg-green-500 text-white">
               New
@@ -118,11 +104,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
           {hasSale && (
             <span className="px-2 py-1 text-xs font-semibold rounded bg-red-500 text-white">
               SALE -{salePercent}%
-            </span>
-          )}
-          {isSeller && hasWholesalePrice && (
-            <span className="px-2 py-1 text-xs font-semibold rounded bg-indigo-500 text-white">
-              Save {wholesaleSavings}%
             </span>
           )}
         </div>
@@ -195,27 +176,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
 
         {/* Price */}
         <div className="mb-2">
-          {isSeller && hasWholesalePrice ? (
-            <>
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-bold text-indigo-600">
-                  {formatCurrency(product.wholesalePrice!)}
-                </span>
-                <span className="text-xs text-gray-500 line-through">
-                  {formatCurrency(product.price)}
-                </span>
-                <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                  Wholesale
-                </span>
-              </div>
-              {product.minWholesaleQuantity && product.minWholesaleQuantity > 1 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Min order: {product.minWholesaleQuantity} units
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-2">
               {product.onSale && product.salePrice ? (
                 <>
                   <span className="text-lg font-bold text-red-600">
@@ -237,8 +198,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
                   )}
                 </>
               )}
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Rating */}

@@ -104,7 +104,7 @@ const Products: React.FC = () => {
     },
   });
 
-  // Fetch vendors (sellers, outlets, manufacturers, importers)
+  // Fetch outlets
   const { data: vendorsData } = useQuery({
     queryKey: ['vendors', 'active'],
     queryFn: async () => {
@@ -300,7 +300,7 @@ const Products: React.FC = () => {
               ))}
               {vendor && (
                 <span className="badge bg-indigo-100 text-indigo-800 flex items-center gap-1">
-                  Seller: {vendorOptions.find((v: { id: string; name: string }) => v.id === vendor)?.name}
+                  Outlet: {vendorOptions.find((v: { id: string; name: string }) => v.id === vendor)?.name}
                   <X
                     className="w-3 h-3 cursor-pointer"
                     onClick={() => updateSearchParams({ vendor: null })}
@@ -433,7 +433,7 @@ const Products: React.FC = () => {
               {/* Vendor/Seller Filter */}
               <div className="border-t pt-4">
                 <h4 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
-                  Select Seller
+                  Select Outlet
                   <ChevronDown className="w-4 h-4" />
                 </h4>
                 <select
@@ -441,18 +441,11 @@ const Products: React.FC = () => {
                   onChange={(e) => updateSearchParams({ vendor: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm bg-white"
                 >
-                  <option value="">All Sellers</option>
+                  <option value="">All Outlets</option>
                   {vendorOptions.map((vendor: { id: string; name: string; role: string }) => {
-                    const roleLabels: Record<string, string> = {
-                      outlet: '🏪',
-                      seller: '🏬',
-                      manufacturer: '🏭',
-                      importer: '✈️'
-                    };
-                    const roleIcon = roleLabels[vendor.role] || '🏢';
                     return (
                       <option key={vendor.id} value={vendor.id}>
-                        {roleIcon} {vendor.name}
+                        {vendor.name}
                       </option>
                     );
                   })}

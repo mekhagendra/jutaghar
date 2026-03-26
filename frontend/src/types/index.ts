@@ -1,7 +1,6 @@
 // User types
-export type UserRole = 'admin' | 'manager' | 'manufacturer' | 'importer' | 'seller' | 'user';
+export type UserRole = 'admin' | 'manager' | 'outlet' | 'user';
 export type UserStatus = 'pending' | 'active' | 'suspended';
-export type BusinessType = 'manufacturer' | 'importer' | 'seller';
 
 export interface Affiliation {
   parentId: string;
@@ -11,7 +10,6 @@ export interface Affiliation {
 
 export interface VendorRequest {
   status: 'none' | 'pending' | 'approved' | 'rejected';
-  type?: BusinessType;
   businessName?: string;
   businessAddress?: string;
   taxId?: string;
@@ -30,7 +28,6 @@ export interface User {
   avatar?: string;
   googleId?: string;
   businessName?: string;
-  businessType?: BusinessType;
   businessLicense?: string;
   businessAddress?: string;
   taxId?: string;
@@ -64,9 +61,6 @@ export interface Product {
   compareAtPrice?: number;
   onSale?: boolean;
   salePrice?: number;
-  wholesalePrice?: number;
-  minWholesaleQuantity?: number;
-  isWholesaleOnly?: boolean;
   category: string | { _id: string; name: string };
   brand?: string | { _id: string; name: string };
   gender?: string;
@@ -190,7 +184,6 @@ export interface RegisterRequest {
   phone: string;
   role?: 'vendor' | 'user';
   businessName?: string;
-  businessType?: BusinessType;
   businessLicense?: string;
   businessAddress?: string;
   taxId?: string;

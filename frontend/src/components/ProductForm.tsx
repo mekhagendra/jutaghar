@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '@/stores/authStore';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -15,9 +14,6 @@ export interface ProductFormData {
   images?: string[];
   onSale?: boolean;
   salePrice?: number;
-  wholesalePrice?: number;
-  minWholesaleQuantity?: number;
-  isWholesaleOnly?: boolean;
   variants?: Array<{
     color: string;
     size: string;
@@ -41,9 +37,6 @@ interface ProductInitialData {
   images?: string[];
   onSale?: boolean;
   salePrice?: number;
-  wholesalePrice?: number;
-  minWholesaleQuantity?: number;
-  isWholesaleOnly?: boolean;
   variants?: Array<{
     color: string;
     size: string;
@@ -69,8 +62,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
   isLoading = false,
   submitLabel = 'Create Product'
 }) => {
-  const { user } = useAuthStore();
-  const isManufacturerOrImporter = user?.businessType === 'manufacturer' || user?.businessType === 'importer';
   
   // Size options from 6 to 13
   const sizeOptions = ['6', '7', '8', '9', '10', '11', '12', '13'];
@@ -112,9 +103,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
     images: initialData?.images || [],
     onSale: initialData?.onSale || false,
     salePrice: initialData?.salePrice,
-    wholesalePrice: initialData?.wholesalePrice,
-    minWholesaleQuantity: initialData?.minWholesaleQuantity || 10,
-    isWholesaleOnly: initialData?.isWholesaleOnly || false,
     variants: initialData?.variants || [],
     stock: initialData?.stock || 0
   });
@@ -182,18 +170,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
     if (!formData.price || formData.price <= 0) newErrors.price = 'Price must be greater than 0';
     if (!formData.category) newErrors.category = 'Category is required';
     if (!formData.brand.trim()) newErrors.brand = 'Brand is required';
-
-    if (isManufacturerOrImporter) {
-      if (!formData.wholesalePrice || formData.wholesalePrice <= 0) {
-        newErrors.wholesalePrice = 'Wholesale price is required for manufacturers/importers';
-      } else if (formData.wholesalePrice >= formData.price) {
-        newErrors.wholesalePrice = 'Wholesale price must be less than retail price';
-      }
-      
-      if (!formData.minWholesaleQuantity || formData.minWholesaleQuantity < 1) {
-        newErrors.minWholesaleQuantity = 'Minimum wholesale quantity is required';
-      }
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -424,63 +400,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Wholesale Pricing */}
-      {isManufacturerOrImporter && (
-        <div className="card">
-          <h3 className="text-lg font-semibold mb-4">Wholesale Pricing</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Wholesale Price (NPR) *
-              </label>
-              <input
-                type="number"
-                name="wholesalePrice"
-                value={formData.wholesalePrice ?? ''}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                className={`input ${errors.wholesalePrice ? 'border-red-500' : ''}`}
-                placeholder="0.00"
-              />
-              {errors.wholesalePrice && <p className="text-red-500 text-sm mt-1">{errors.wholesalePrice}</p>}
-              <p className="text-sm text-gray-500 mt-1">Price for bulk purchases by sellers</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Minimum Wholesale Quantity *
-              </label>
-              <input
-                type="number"
-                name="minWholesaleQuantity"
-                value={formData.minWholesaleQuantity ?? ''}
-                onChange={handleChange}
-                min="1"
-                className={`input ${errors.minWholesaleQuantity ? 'border-red-500' : ''}`}
-                placeholder="10"
-              />
-              {errors.minWholesaleQuantity && <p className="text-red-500 text-sm mt-1">{errors.minWholesaleQuantity}</p>}
-              <p className="text-sm text-gray-500 mt-1">Minimum quantity for wholesale orders</p>
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="isWholesaleOnly"
-                  checked={formData.isWholesaleOnly}
-                  onChange={handleChange}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700">Wholesale Only (hide from retail customers)</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Product Variants (Size, Color, Stock) */}
       <div className="card">

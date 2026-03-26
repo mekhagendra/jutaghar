@@ -7,19 +7,15 @@ const router = express.Router();
 // Get all active vendors (public route for outlets page)
 router.get('/', async (req, res) => {
   try {
-    const { isApproved, role } = req.query;
+    const { isApproved } = req.query;
     
     const query = { 
-      role: { $in: ['manufacturer', 'importer', 'seller', 'outlet'] },
+      role: 'outlet',
       isActive: true
     };
     
     if (isApproved === 'true') {
       query.status = 'active';
-    }
-    
-    if (role && ['manufacturer', 'importer', 'seller', 'outlet'].includes(role)) {
-      query.role = role;
     }
 
     const vendors = await User.find(query)

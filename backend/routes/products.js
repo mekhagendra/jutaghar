@@ -10,18 +10,12 @@ const createProductValidation = [
   body('name').trim().notEmpty(),
   body('description').trim().notEmpty(),
   body('price').isFloat({ min: 0 }).withMessage('Price is required and must be greater than 0'),
-  body('category').trim().notEmpty(),
-  body('wholesalePrice').optional().isFloat({ min: 0 }),
-  body('minWholesaleQuantity').optional().isInt({ min: 1 }),
-  body('isWholesaleOnly').optional().isBoolean()
+  body('category').trim().notEmpty()
 ];
 
 // Public routes
 router.get('/', optionalAuth, productController.getProducts);
 router.get('/colors', productController.getProductColors);
-
-// Wholesale products (only accessible to sellers) - must be before /:id route
-router.get('/wholesale/catalog', authenticate, productController.getWholesaleProducts);
 
 // Vendor routes (requires authentication + vendor role)
 router.get('/vendor/my-products', authenticate, requireVendor, productController.getVendorProducts);

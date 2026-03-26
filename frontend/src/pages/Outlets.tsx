@@ -17,16 +17,12 @@ interface Vendor {
 
 const Outlets: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'all' | 'outlet' | 'seller' | 'manufacturer' | 'importer'>('all');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['outlets', selectedRole],
+    queryKey: ['outlets'],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('isApproved', 'true');
-      if (selectedRole !== 'all') {
-        params.append('role', selectedRole);
-      }
       const response = await api.get(`/api/outlets?${params.toString()}`);
       return response.data.data;
     },
@@ -40,25 +36,14 @@ const Outlets: React.FC = () => {
     vendor.businessAddress?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getRoleBadge = (role: string) => {
-    const badges = {
-      outlet: { bg: 'bg-pink-100', text: 'text-pink-800', label: 'Outlet' },
-      seller: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Seller' },
-      manufacturer: { bg: 'bg-indigo-100', text: 'text-indigo-800', label: 'Manufacturer' },
-      importer: { bg: 'bg-cyan-100', text: 'text-cyan-800', label: 'Importer' },
-    };
-    const badge = badges[role as keyof typeof badges] || { bg: 'bg-gray-100', text: 'text-gray-800', label: role };
-    return badge;
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 text-white py-16">
         <div className="container mx-auto px-4">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Outlets & Partners</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Outlets</h1>
           <p className="text-xl text-primary-100 max-w-2xl">
-            Discover our network of trusted outlets, sellers, manufacturers, and importers across the region
+            Discover our network of trusted outlets across the region
           </p>
         </div>
       </div>
@@ -66,74 +51,15 @@ const Outlets: React.FC = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Filters Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search by name or location..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-
-            {/* Role Filter */}
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => setSelectedRole('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  selectedRole === 'all'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setSelectedRole('outlet')}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  selectedRole === 'outlet'
-                    ? 'bg-pink-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Outlets
-              </button>
-              <button
-                onClick={() => setSelectedRole('seller')}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  selectedRole === 'seller'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Sellers
-              </button>
-              <button
-                onClick={() => setSelectedRole('manufacturer')}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  selectedRole === 'manufacturer'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Manufacturers
-              </button>
-              <button
-                onClick={() => setSelectedRole('importer')}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  selectedRole === 'importer'
-                    ? 'bg-cyan-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Importers
-              </button>
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search by name or location..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
           </div>
         </div>
 
@@ -159,9 +85,7 @@ const Outlets: React.FC = () => {
 
             {/* Outlets Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredVendors.map((vendor: Vendor) => {
-                const roleBadge = getRoleBadge(vendor.role);
-                return (
+              {filteredVendors.map((vendor: Vendor) => (
                   <div
                     key={vendor._id}
                     className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200 group"
@@ -169,14 +93,9 @@ const Outlets: React.FC = () => {
                     <div className="p-6">
                       {/* Header */}
                       <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition">
-                            {vendor.businessName || vendor.fullName}
-                          </h3>
-                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${roleBadge.bg} ${roleBadge.text}`}>
-                            {roleBadge.label}
-                          </span>
-                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition flex-1">
+                          {vendor.businessName || vendor.fullName}
+                        </h3>
                         <Store className="w-10 h-10 text-primary-600 bg-primary-50 p-2 rounded-lg flex-shrink-0" />
                       </div>
 
@@ -219,8 +138,7 @@ const Outlets: React.FC = () => {
                       </Link>
                     </div>
                   </div>
-                );
-              })}
+                ))}
             </div>
           </>
         )}

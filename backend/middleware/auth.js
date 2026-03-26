@@ -164,8 +164,8 @@ export const requireRole = (...roles) => {
 // Require admin role
 export const requireAdmin = requireRole('admin', 'manager');
 
-// Require vendor role (manufacturer, importer, seller, or outlet)
-export const requireVendor = requireRole('manufacturer', 'importer', 'seller', 'outlet', 'admin', 'manager');
+// Require vendor role (outlet)
+export const requireVendor = requireRole('outlet', 'admin', 'manager');
 
 // Optional authentication (doesn't fail if no token)
 export const optionalAuth = async (req, res, next) => {

@@ -98,7 +98,6 @@ export const initiateOrder = async (req, res) => {
     const order = new Order({
       orderNumber,
       user: req.user._id,
-      orderType: 'B2C',
       items: orderItems,
       subtotal,
       tax: taxDisplay, // store the display tax amount (inclusive component or exclusive addition)

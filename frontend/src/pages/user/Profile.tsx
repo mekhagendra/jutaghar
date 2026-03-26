@@ -49,14 +49,13 @@ const UserProfile: React.FC = () => {
 
   // Vendor request state
   const [vendorForm, setVendorForm] = useState({
-    type: '' as '' | 'manufacturer' | 'importer' | 'seller',
     businessName: '',
     businessAddress: '',
     taxId: '',
   });
 
   const vendorRequestMutation = useMutation({
-    mutationFn: async (data: { type: string; businessName: string; businessAddress: string; taxId: string }) => {
+    mutationFn: async (data: { businessName: string; businessAddress: string; taxId: string }) => {
       const response = await api.post('/api/auth/vendor-request', data);
       return response.data;
     },
@@ -75,10 +74,6 @@ const UserProfile: React.FC = () => {
     e.preventDefault();
     if (!vendorForm.businessName.trim()) {
       toast.error('Business name is required');
-      return;
-    }
-    if (!vendorForm.type) {
-      toast.error('Please select a business category');
       return;
     }
     if (!vendorForm.taxId.trim()) {
@@ -246,7 +241,7 @@ const UserProfile: React.FC = () => {
         <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <Store className="w-4 h-4" />
-            Become a Vendor
+            Become an Outlet
           </h2>
 
           {vendorRequestStatus === 'pending' && (
@@ -255,7 +250,7 @@ const UserProfile: React.FC = () => {
               <div>
                 <p className="font-medium text-amber-800">Request Pending</p>
                 <p className="text-sm text-amber-700 mt-1">
-                  Your vendor request as <span className="font-semibold capitalize">{user?.vendorRequest?.type}</span> is under review.
+                  Your outlet request is under review.
                   You'll be notified once it's approved.
                 </p>
               </div>
@@ -269,7 +264,7 @@ const UserProfile: React.FC = () => {
                 <div>
                   <p className="font-medium text-red-800">Request Rejected</p>
                   <p className="text-sm text-red-700 mt-1">
-                    Your previous vendor request was rejected.
+                    Your previous outlet request was rejected.
                     {user?.vendorRequest?.rejectionReason && (
                       <> Reason: <span className="font-medium">{user.vendorRequest.rejectionReason}</span></>
                     )}
@@ -286,7 +281,7 @@ const UserProfile: React.FC = () => {
               <div>
                 <p className="font-medium text-green-800">Request Approved!</p>
                 <p className="text-sm text-green-700 mt-1">
-                  Your vendor account has been approved. Please log out and log back in to access your vendor dashboard.
+                  Your outlet account has been approved. Please log out and log back in to access your outlet dashboard.
                 </p>
               </div>
             </div>
@@ -295,7 +290,7 @@ const UserProfile: React.FC = () => {
           {(vendorRequestStatus === 'none' || vendorRequestStatus === 'rejected') && (
             <form onSubmit={handleVendorSubmit} className="space-y-4 mt-4">
               <p className="text-sm text-gray-600">
-                Apply to become a vendor on Juta Ghar. Fill in your business details below.
+                Apply to become an outlet on Juta Ghar. Fill in your business details below.
               </p>
 
               <div>
@@ -311,20 +306,6 @@ const UserProfile: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Business Category *</label>
-                  <select
-                    value={vendorForm.type}
-                    onChange={(e) => setVendorForm((f) => ({ ...f, type: e.target.value as typeof vendorForm.type }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
-                    required
-                  >
-                    <option value="">Select category</option>
-                    <option value="manufacturer">Manufacture</option>
-                    <option value="importer">Import</option>
-                    <option value="seller">Retail</option>
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Business Tax ID *</label>
                   <input
@@ -351,11 +332,11 @@ const UserProfile: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={vendorRequestMutation.isPending || !vendorForm.type || !vendorForm.taxId.trim()}
+                disabled={vendorRequestMutation.isPending || !vendorForm.businessName.trim() || !vendorForm.taxId.trim()}
                 className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-60"
               >
                 <Store className="w-4 h-4" />
-                {vendorRequestMutation.isPending ? 'Submitting...' : 'Submit Vendor Request'}
+                {vendorRequestMutation.isPending ? 'Submitting...' : 'Submit Outlet Request'}
               </button>
             </form>
           )}

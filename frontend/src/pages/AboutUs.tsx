@@ -9,7 +9,7 @@ const AboutUs: React.FC = () => {
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold mb-4">About JutaGhar</h1>
           <p className="text-lg text-white/90 max-w-2xl mx-auto">
-            Nepal's leading multi-vendor B2B and B2C e-commerce platform for footwear — connecting manufacturers, importers, sellers, and customers.
+            Nepal's leading e-commerce platform for footwear — connecting outlets and customers.
           </p>
         </div>
       </div>
@@ -19,7 +19,7 @@ const AboutUs: React.FC = () => {
         <section className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Our Mission</h2>
           <p className="text-gray-600 leading-relaxed">
-            JutaGhar aims to revolutionize the footwear industry in Nepal by providing a seamless platform where manufacturers, importers, and retailers can connect directly with customers. We believe everyone deserves access to quality footwear at fair prices.
+            JutaGhar aims to revolutionize the footwear industry in Nepal by providing a seamless platform where outlets can connect directly with customers. We believe everyone deserves access to quality footwear at fair prices.
           </p>
         </section>
 
@@ -28,8 +28,8 @@ const AboutUs: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900 text-center mb-10">Why Choose Us</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
-              { icon: ShoppingBag, title: 'Wide Selection', desc: 'Thousands of shoes from trusted brands and local manufacturers.' },
-              { icon: Users, title: 'Multi-Vendor', desc: 'Shop from manufacturers, importers, and retailers all in one place.' },
+              { icon: ShoppingBag, title: 'Wide Selection', desc: 'Thousands of shoes from trusted brands and local outlets.' },
+              { icon: Users, title: 'Multi-Vendor', desc: 'Shop from multiple outlets all in one place.' },
               { icon: Truck, title: 'Fast Delivery', desc: 'Reliable shipping across Nepal with real-time order tracking.' },
               { icon: Shield, title: 'Secure Shopping', desc: 'Safe payments through eSewa, Khalti, and cash on delivery.' },
             ].map((item) => (
