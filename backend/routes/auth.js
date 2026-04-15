@@ -25,6 +25,7 @@ router.post('/google', authController.googleLogin);
 router.post('/refresh', authController.refreshToken);
 router.get('/me', authenticate, authController.getCurrentUser);
 router.post('/logout', authenticate, authController.logout);
+router.delete('/account', authenticate, authController.deleteAccount);
 
 // Vendor request (authenticated users)
 router.post('/vendor-request', authenticate, authController.requestVendor);

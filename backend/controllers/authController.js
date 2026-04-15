@@ -1,6 +1,8 @@
 import { validationResult } from 'express-validator';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
+import Order from '../models/Order.js';
+import Review from '../models/Review.js';
 import { hashPassword, comparePassword, generateToken, generateRefreshToken, verifyToken } from '../utils/auth.js';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -460,6 +462,48 @@ export const getVendorRequests = async (req, res) => {
       success: true,
       data: users
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Delete own account and associated data
+export const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { password } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Require password confirmation (skip for Google-only accounts)
+    if (user.password) {
+      if (!password) {
+        return res.status(400).json({ success: false, message: 'Password is required to delete your account' });
+      }
+      const isMatch = await comparePassword(password, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Incorrect password' });
+      }
+    }
+
+    // Prevent admin/outlet from self-deleting via this endpoint
+    if (user.role === 'admin' || user.role === 'outlet') {
+      return res.status(403).json({ success: false, message: 'Admin and vendor accounts cannot be deleted via this endpoint. Please contact support.' });
+    }
+
+    // Delete user's reviews
+    await Review.deleteMany({ user: userId });
+
+    // Anonymize orders (keep orders for accounting, remove user reference)
+    await Order.updateMany({ user: userId }, { $set: { 'shippingAddress.fullName': 'Deleted User', 'shippingAddress.phone': '', 'shippingAddress.address': '' } });
+
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+
+    res.json({ success: true, message: 'Account and associated data deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

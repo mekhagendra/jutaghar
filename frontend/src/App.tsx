@@ -18,6 +18,7 @@ const Sale = lazy(() => import('@/pages/sale'));
 const AboutUs = lazy(() => import('@/pages/AboutUs'));
 const ReturnPolicy = lazy(() => import('@/pages/ReturnPolicy'));
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
+const DeleteAccount = lazy(() => import('@/pages/DeleteAccount'));
 const Contact = lazy(() => import('@/pages/Contact'));
 const ShippingInfo = lazy(() => import('@/pages/ShippingInfo'));
 
@@ -127,6 +128,7 @@ function App() {
             <Route path="/about-us" element={<AboutUs />} />
             <Route path="/return-policy" element={<ReturnPolicy />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/delete-account" element={<DeleteAccount />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/shipping-info" element={<ShippingInfo />} />
             
