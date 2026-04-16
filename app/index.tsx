@@ -35,8 +35,6 @@ type Screen =
   | 'about'
   | 'contact';
 
-const TAB_SCREENS: Screen[] = ['home', 'products', 'cart', 'wishlist', 'profile'];
-
 export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,6 +45,9 @@ export default function Index() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedGender, setSelectedGender] = useState<string | null>(null);
+  const [selectedSort, setSelectedSort] = useState<string | null>(null);
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
 
   const navigateTo = (screen: Screen) => {
@@ -137,8 +138,11 @@ export default function Index() {
     navigateTo('cart');
   };
 
-  const handleViewProducts = (categoryId?: string) => {
-    setSelectedCategory(categoryId || null);
+  const handleViewProducts = (options?: { category?: string; gender?: string; sort?: string; brand?: string }) => {
+    setSelectedCategory(options?.category || null);
+    setSelectedGender(options?.gender || null);
+    setSelectedSort(options?.sort || null);
+    setSelectedBrand(options?.brand || null);
     navigateTo('products');
   };
 
@@ -166,6 +170,9 @@ export default function Index() {
     setSelectedProduct(null);
     setSelectedOrderId(null);
     setSelectedCategory(null);
+    setSelectedGender(null);
+    setSelectedSort(null);
+    setSelectedBrand(null);
   };
 
   const getActiveTab = (): TabName => {
@@ -221,60 +228,63 @@ export default function Index() {
     );
   }
 
-  // Detail/transactional screens (no footer)
-  if (currentScreen === 'product-detail' && selectedProduct) {
-    return (
-      <ProductDetailScreen
-        product={selectedProduct}
-        onBack={goBack}
-        onViewCart={handleViewCart}
-      />
-    );
-  }
+  // Detail/transactional screens (with footer)
+  const renderScreenContent = () => {
+    if (currentScreen === 'product-detail' && selectedProduct) {
+      return (
+        <ProductDetailScreen
+          product={selectedProduct}
+          onBack={goBack}
+          onViewCart={handleViewCart}
+        />
+      );
+    }
 
-  if (currentScreen === 'checkout') {
-    return (
-      <CheckoutScreen
-        onBack={goBack}
-        onOrderSuccess={(orderId) => handleViewOrder(orderId)}
-      />
-    );
-  }
+    if (currentScreen === 'checkout') {
+      return (
+        <CheckoutScreen
+          onBack={goBack}
+          onOrderSuccess={(orderId) => handleViewOrder(orderId)}
+        />
+      );
+    }
 
-  if (currentScreen === 'orders') {
-    return (
-      <OrdersScreen
-        onBack={goBack}
-        onViewOrder={handleViewOrder}
-      />
-    );
-  }
+    if (currentScreen === 'orders') {
+      return (
+        <OrdersScreen
+          onBack={goBack}
+          onViewOrder={handleViewOrder}
+        />
+      );
+    }
 
-  if (currentScreen === 'order-detail' && selectedOrderId) {
-    return (
-      <OrderDetailScreen
-        orderId={selectedOrderId}
-        onBack={goBack}
-      />
-    );
-  }
+    if (currentScreen === 'order-detail' && selectedOrderId) {
+      return (
+        <OrderDetailScreen
+          orderId={selectedOrderId}
+          onBack={goBack}
+        />
+      );
+    }
 
-  if (currentScreen === 'about') {
-    return <AboutUsScreen onBack={goBack} />;
-  }
+    if (currentScreen === 'about') {
+      return <AboutUsScreen onBack={goBack} />;
+    }
 
-  if (currentScreen === 'contact') {
-    return <ContactScreen onBack={goBack} />;
-  }
+    if (currentScreen === 'contact') {
+      return <ContactScreen onBack={goBack} />;
+    }
 
-  // Tab screens with footer
-  const renderTabContent = () => {
+    // Tab screens
     switch (currentScreen) {
       case 'products':
         return (
           <ProductsScreen
             onViewProduct={handleViewProduct}
             initialCategory={selectedCategory}
+            initialGender={selectedGender}
+            initialSort={selectedSort}
+            initialBrand={selectedBrand}
           />
         );
       case 'cart':
@@ -300,7 +310,6 @@ export default function Index() {
       default:
         return (
           <HomeScreen
-            userData={userData}
             onViewProduct={handleViewProduct}
             onViewProducts={handleViewProducts}
           />
@@ -310,7 +319,7 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1 }}>
-      {renderTabContent()}
+      {renderScreenContent()}
       <Footer
         activeTab={getActiveTab()}
         onNavigate={handleTabPress}

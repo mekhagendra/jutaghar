@@ -26,6 +26,9 @@ interface ProductsScreenProps {
   onViewProduct: (product: Product) => void;
   onViewCart?: () => void;
   initialCategory?: string | null;
+  initialGender?: string | null;
+  initialSort?: string | null;
+  initialBrand?: string | null;
   initialSearch?: string;
 }
 
@@ -34,6 +37,9 @@ export default function ProductsScreen({
   onViewProduct,
   onViewCart,
   initialCategory,
+  initialGender,
+  initialSort,
+  initialBrand,
   initialSearch,
 }: ProductsScreenProps) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -42,9 +48,9 @@ export default function ProductsScreen({
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(initialSearch || '');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory || null);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [selectedGender, setSelectedGender] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState('new');
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(initialBrand || null);
+  const [selectedGender, setSelectedGender] = useState<string | null>(initialGender || null);
+  const [sortBy, setSortBy] = useState(initialSort || 'new');
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [minPrice, setMinPrice] = useState('');
