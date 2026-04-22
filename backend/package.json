@@ -40,6 +40,7 @@
     "marked": "^18.0.2",
     "mongoose": "^8.0.3",
     "multer": "^2.0.2",
+    "nanoid": "^5.1.9",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "otplib": "^13.4.0",

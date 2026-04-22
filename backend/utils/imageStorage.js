@@ -1,5 +1,14 @@
 import { v2 as cloudinary } from 'cloudinary';
 
+const DATA_URI_REGEX = /^data:image\/(png|jpg|jpeg|webp);base64,(.+)$/i;
+const MAX_IMAGE_SIZE_BYTES = 3 * 1024 * 1024;
+
+function badRequest(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
 let isConfigured = false;
 
 function parseCloudinaryUrl(cloudinaryUrl) {
@@ -61,15 +70,30 @@ function getFolder(subDir) {
 }
 
 export async function saveBase64Image(imageData, subDir = 'products') {
-  if (!imageData || typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
+  if (!imageData || typeof imageData !== 'string' || !imageData.startsWith('data:')) {
     return imageData;
+  }
+
+  const match = imageData.match(DATA_URI_REGEX);
+  if (!match) {
+    throw badRequest('Only png, jpg, jpeg, and webp image data URIs are allowed');
+  }
+
+  const base64Payload = match[2];
+  const decoded = Buffer.from(base64Payload, 'base64');
+  if (!decoded.length && base64Payload.trim()) {
+    throw badRequest('Invalid base64 image payload');
+  }
+  if (decoded.length > MAX_IMAGE_SIZE_BYTES) {
+    throw badRequest('Image exceeds maximum size of 3 MB');
   }
 
   ensureCloudinaryConfigured();
 
   const result = await cloudinary.uploader.upload(imageData, {
     folder: getFolder(subDir),
-    resource_type: 'image'
+    resource_type: 'image',
+    allowed_formats: ['png', 'jpg', 'jpeg', 'webp']
   });
 
   return result.secure_url;

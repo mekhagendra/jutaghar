@@ -6,7 +6,8 @@ module.exports = {
   },
   moduleNameMapper: {
     '^otplib$': '<rootDir>/__mocks__/otplib.js',
-    '^qrcode$': '<rootDir>/__mocks__/qrcode.js'
+    '^qrcode$': '<rootDir>/__mocks__/qrcode.js',
+    '^nanoid$': '<rootDir>/__mocks__/nanoid.js'
   },
   testMatch: ['**/__tests__/**/*.test.js'],
   clearMocks: true,

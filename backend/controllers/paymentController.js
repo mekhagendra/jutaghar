@@ -7,6 +7,7 @@ import DeliverySettings from '../models/DeliverySettings.js';
 import { calculateTaxForItems } from '../utils/taxCalculator.js';
 import logger from '../utils/logger.js';
 import { writeAudit } from '../utils/audit.js';
+import { generateOrderNumber } from '../utils/orderNumber.js';
 
 // eSewa configuration — fail fast if secrets are absent
 if (!process.env.ESEWA_SECRET_KEY) {
@@ -282,13 +283,7 @@ export const initiateOrder = async (req, res) => {
     const shippingCost = await DeliverySettings.calculateShipping(subtotal);
     const total = subtotal + tax + shippingCost;
 
-    // Generate order number
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const orderNumber = `JG${year}${month}${day}${random}`;
+    const orderNumber = generateOrderNumber();
 
     // Create pending order
     const order = new Order({
