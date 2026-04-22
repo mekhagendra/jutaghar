@@ -11,6 +11,7 @@ import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendOtpEmail } fr
 import { authenticator } from 'otplib';
 import qrcode from 'qrcode';
 import { encryptSecret, decryptSecret, generateRecoveryCodes, hashRecoveryCodes, findRecoveryCodeIndex } from '../utils/mfa.js';
+import { writeAudit } from '../utils/audit.js';
 
 const REFRESH_COOKIE_NAME = 'jg_rt';
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -262,6 +263,12 @@ export const login = async (req, res) => {
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
+      await writeAudit({
+        req,
+        action: 'AUTH_LOGIN_FAILED',
+        target: 'user',
+        metadata: { email, reason: 'user_not_found' },
+      });
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -271,6 +278,14 @@ export const login = async (req, res) => {
     // Check password
     const isMatch = await comparePassword(password, user.password);
     if (!isMatch) {
+      await writeAudit({
+        req,
+        actor: String(user._id),
+        action: 'AUTH_LOGIN_FAILED',
+        target: 'user',
+        targetId: user._id,
+        metadata: { email, reason: 'invalid_password' },
+      });
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -279,6 +294,14 @@ export const login = async (req, res) => {
 
     // Check if account is active
     if (user.status === 'suspended') {
+      await writeAudit({
+        req,
+        actor: String(user._id),
+        action: 'AUTH_LOGIN_FAILED',
+        target: 'user',
+        targetId: user._id,
+        metadata: { email, reason: 'suspended' },
+      });
       return res.status(403).json({
         success: false,
         message: 'Account is suspended'
@@ -286,6 +309,14 @@ export const login = async (req, res) => {
     }
 
     if (user.status === 'pending' && user.role === 'outlet') {
+      await writeAudit({
+        req,
+        actor: String(user._id),
+        action: 'AUTH_LOGIN_FAILED',
+        target: 'user',
+        targetId: user._id,
+        metadata: { email, reason: 'outlet_pending_approval' },
+      });
       return res.status(403).json({
         success: false,
         message: 'Account is pending approval'
@@ -293,6 +324,14 @@ export const login = async (req, res) => {
     }
 
     if (user.emailVerified === false) {
+      await writeAudit({
+        req,
+        actor: String(user._id),
+        action: 'AUTH_LOGIN_FAILED',
+        target: 'user',
+        targetId: user._id,
+        metadata: { email, reason: 'email_not_verified' },
+      });
       return res.status(403).json({
         success: false,
         message: 'Please verify your email before login'
@@ -302,6 +341,14 @@ export const login = async (req, res) => {
     // MFA gate for admin / outlet roles
     if (['admin', 'manager', 'outlet'].includes(user.role) && user.mfa?.enabled) {
       const mfa_token = generateMfaToken(user._id);
+      await writeAudit({
+        req,
+        actor: String(user._id),
+        action: 'AUTH_LOGIN_SUCCESS',
+        target: 'user',
+        targetId: user._id,
+        metadata: { email, mfaRequired: true },
+      });
       return res.json({ success: true, mfa_required: true, mfa_token });
     }
 
@@ -309,6 +356,15 @@ export const login = async (req, res) => {
     const accessToken = generateToken(user._id, user.role);
     const { rawToken: refreshToken } = await createSession(user._id, req);
     setRefreshCookie(res, refreshToken);
+
+    await writeAudit({
+      req,
+      actor: String(user._id),
+      action: 'AUTH_LOGIN_SUCCESS',
+      target: 'user',
+      targetId: user._id,
+      metadata: { email, mfaRequired: false },
+    });
 
     res.json({
       success: true,
@@ -493,6 +549,15 @@ export const requestForgotPasswordOtp = async (req, res) => {
       otp
     });
 
+    await writeAudit({
+      req,
+      actor: String(user._id),
+      action: 'AUTH_FORGOT_PASSWORD_OTP_REQUESTED',
+      target: 'user',
+      targetId: user._id,
+      metadata: { email: user.email },
+    });
+
     res.json({
       success: true,
       message: 'If your email is registered, OTP instructions have been sent.'
@@ -542,6 +607,15 @@ export const verifyForgotPasswordOtp = async (req, res) => {
     user.password = await hashPassword(newPassword);
     user.passwordReset = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
     await user.save();
+
+    await writeAudit({
+      req,
+      actor: String(user._id),
+      action: 'AUTH_FORGOT_PASSWORD_RESET_VERIFIED',
+      target: 'user',
+      targetId: user._id,
+      metadata: { email: user.email },
+    });
 
     res.json({ success: true, message: 'Password reset successfully. Please login with your new password.' });
   } catch (error) {
@@ -828,6 +902,19 @@ export const reviewVendorRequest = async (req, res) => {
 
     await user.save();
 
+    await writeAudit({
+      req,
+      action: action === 'approve' ? 'AUTH_VENDOR_REQUEST_APPROVED' : 'AUTH_VENDOR_REQUEST_REJECTED',
+      target: 'user',
+      targetId: user._id,
+      metadata: {
+        reviewerId: String(req.user._id),
+        roleAfterReview: user.role,
+        vendorRequestStatus: user.vendorRequest?.status,
+        rejectionReason: action === 'reject' ? (rejectionReason || '') : undefined,
+      },
+    });
+
     res.json({
       success: true,
       message: `Vendor request ${action}d successfully`,
@@ -889,6 +976,15 @@ export const deleteAccount = async (req, res) => {
 
     // Delete the user
     await User.findByIdAndDelete(userId);
+
+    await writeAudit({
+      req,
+      actor: String(userId),
+      action: 'AUTH_ACCOUNT_DELETED',
+      target: 'user',
+      targetId: userId,
+      metadata: { email: user.email, role: user.role },
+    });
 
     res.json({ success: true, message: 'Account and associated data deleted successfully' });
   } catch (error) {

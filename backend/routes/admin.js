@@ -23,5 +23,6 @@ router.patch('/vendors/:id/status', adminController.updateVendorStatus);
 
 // Statistics
 router.get('/stats', adminController.getAdminStats);
+router.get('/audit-log', adminController.getAuditLog);
 
 export default router;

@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import DeliverySettings from '../models/DeliverySettings.js';
 import { calculateTaxForItems } from '../utils/taxCalculator.js';
 import logger from '../utils/logger.js';
+import { writeAudit } from '../utils/audit.js';
 
 // eSewa configuration — fail fast if secrets are absent
 if (!process.env.ESEWA_SECRET_KEY) {
@@ -307,6 +308,17 @@ export const initiateOrder = async (req, res) => {
     await order.save({ session });
     await session.commitTransaction();
 
+    await writeAudit({
+      req,
+      action: 'PAYMENT_ORDER_INITIATED',
+      target: 'order',
+      targetId: order._id,
+      metadata: {
+        paymentMethod: order.paymentMethod,
+        total: order.total,
+      },
+    });
+
     res.status(201).json({
       success: true,
       data: {
@@ -461,10 +473,24 @@ export const verifyEsewaPayment = async (req, res) => {
       });
     }
 
-    await settleOrderFromGatewayResult({
+    const result = await settleOrderFromGatewayResult({
       order,
       isPaid: true,
       gatewayTransactionId: transaction_code,
+    });
+
+    await writeAudit({
+      req,
+      actor: req.user ? String(req.user._id) : 'system',
+      action: 'PAYMENT_ESEWA_VERIFIED',
+      target: 'order',
+      targetId: order._id,
+      metadata: {
+        idempotent: result.idempotent,
+        orderStatus: result.orderStatus,
+        paymentStatus: result.paymentStatus,
+        gatewayTransactionId: transaction_code,
+      },
     });
 
     res.json({
@@ -545,11 +571,25 @@ export const verifyKhaltiPayment = async (req, res) => {
       });
     }
 
-    await settleOrderFromGatewayResult({
+    const result = await settleOrderFromGatewayResult({
       order,
       isPaid: true,
       gatewayTransactionId: transaction_id || paymentData.transaction_id || null,
       gatewayPidx: pidx,
+    });
+
+    await writeAudit({
+      req,
+      action: 'PAYMENT_KHALTI_VERIFIED',
+      target: 'order',
+      targetId: order._id,
+      metadata: {
+        idempotent: result.idempotent,
+        orderStatus: result.orderStatus,
+        paymentStatus: result.paymentStatus,
+        gatewayTransactionId: transaction_id || paymentData.transaction_id || null,
+        pidx,
+      },
     });
 
     res.json({

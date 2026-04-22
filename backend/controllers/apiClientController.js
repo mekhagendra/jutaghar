@@ -1,5 +1,6 @@
 import ApiClient from '../models/ApiClient.js';
 import User from '../models/User.js';
+import { writeAudit } from '../utils/audit.js';
 
 // Create API client
 export const createApiClient = async (req, res) => {
@@ -30,6 +31,18 @@ export const createApiClient = async (req, res) => {
     });
 
     await apiClient.save();
+
+    await writeAudit({
+      req,
+      action: 'API_CLIENT_CREATED',
+      target: 'api_client',
+      targetId: apiClient._id,
+      metadata: {
+        ownerId: String(apiClient.owner),
+        scopes: apiClient.scopes,
+        status: apiClient.status,
+      },
+    });
 
     // Return the plain secret only once (won't be retrievable later)
     res.status(201).json({
@@ -180,6 +193,17 @@ export const regenerateSecret = async (req, res) => {
     apiClient.clientSecret = clientSecret;
     await apiClient.save();
 
+    await writeAudit({
+      req,
+      action: 'API_CLIENT_SECRET_REGENERATED',
+      target: 'api_client',
+      targetId: apiClient._id,
+      metadata: {
+        ownerId: String(apiClient.owner),
+        clientId: apiClient.clientId,
+      },
+    });
+
     res.json({
       success: true,
       message: 'Client secret regenerated successfully. Save it - it won\'t be shown again.',
@@ -211,6 +235,17 @@ export const deleteApiClient = async (req, res) => {
         message: 'API client not found'
       });
     }
+
+    await writeAudit({
+      req,
+      action: 'API_CLIENT_DELETED',
+      target: 'api_client',
+      targetId: apiClient._id,
+      metadata: {
+        ownerId: String(apiClient.owner),
+        clientId: apiClient.clientId,
+      },
+    });
 
     res.json({
       success: true,
@@ -278,6 +313,17 @@ export const revokeApiClient = async (req, res) => {
 
     apiClient.status = 'revoked';
     await apiClient.save();
+
+    await writeAudit({
+      req,
+      action: 'API_CLIENT_REVOKED',
+      target: 'api_client',
+      targetId: apiClient._id,
+      metadata: {
+        ownerId: String(apiClient.owner),
+        clientId: apiClient.clientId,
+      },
+    });
 
     res.json({
       success: true,

@@ -1,7 +1,9 @@
 import User from '../models/User.js';
 import Product from '../models/Product.js';
 import Order from '../models/Order.js';
+import AuditLog from '../models/AuditLog.js';
 import { asNumber, asObjectId, asString, stripOperators } from '../utils/sanitizeInput.js';
+import { writeAudit } from '../utils/audit.js';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -99,6 +101,7 @@ export const updateUserStatus = async (req, res) => {
       });
     }
 
+    const existingUser = await User.findById(asObjectId(req.params.id)).select('status');
     const user = await User.findByIdAndUpdate(
       asObjectId(req.params.id),
       { status },
@@ -111,6 +114,17 @@ export const updateUserStatus = async (req, res) => {
         message: 'User not found'
       });
     }
+
+    await writeAudit({
+      req,
+      action: 'ADMIN_USER_STATUS_UPDATED',
+      target: 'user',
+      targetId: user._id,
+      metadata: {
+        fromStatus: existingUser?.status,
+        toStatus: user.status,
+      },
+    });
 
     res.json({
       success: true,
@@ -137,6 +151,7 @@ export const updateUserRole = async (req, res) => {
       });
     }
 
+    const existingUser = await User.findById(asObjectId(req.params.id)).select('role');
     const user = await User.findByIdAndUpdate(
       asObjectId(req.params.id),
       { role },
@@ -149,6 +164,17 @@ export const updateUserRole = async (req, res) => {
         message: 'User not found'
       });
     }
+
+    await writeAudit({
+      req,
+      action: 'ADMIN_USER_ROLE_UPDATED',
+      target: 'user',
+      targetId: user._id,
+      metadata: {
+        fromRole: existingUser?.role,
+        toRole: user.role,
+      },
+    });
 
     res.json({
       success: true,
@@ -293,6 +319,17 @@ export const approveVendor = async (req, res) => {
     vendor.approvedBy = req.user._id;
     await vendor.save();
 
+    await writeAudit({
+      req,
+      action: 'ADMIN_VENDOR_APPROVED',
+      target: 'user',
+      targetId: vendor._id,
+      metadata: {
+        role: vendor.role,
+        status: vendor.status,
+      },
+    });
+
     res.json({
       success: true,
       data: vendor,
@@ -330,6 +367,18 @@ export const rejectVendor = async (req, res) => {
 
     vendor.status = 'suspended';
     await vendor.save();
+
+    await writeAudit({
+      req,
+      action: 'ADMIN_VENDOR_REJECTED',
+      target: 'user',
+      targetId: vendor._id,
+      metadata: {
+        role: vendor.role,
+        status: vendor.status,
+        reason,
+      },
+    });
 
     res.json({
       success: true,
@@ -411,6 +460,48 @@ export const getAdminStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal error', requestId: req.id
+    });
+  }
+};
+
+export const getAuditLog = async (req, res) => {
+  try {
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 20)));
+    const action = safeQuery.action ? asString(safeQuery.action) : '';
+    const actor = safeQuery.actor ? asString(safeQuery.actor) : '';
+
+    const query = {};
+    if (action) query.action = action;
+    if (actor) query.actor = actor;
+
+    const skip = (page - 1) * limit;
+
+    const [entries, total] = await Promise.all([
+      AuditLog.find(query)
+        .sort('-createdAt')
+        .skip(skip)
+        .limit(limit),
+      AuditLog.countDocuments(query),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        entries,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    res.status(errorStatus(error)).json({
+      success: false,
+      message: 'Internal error', requestId: req.id,
     });
   }
 };
