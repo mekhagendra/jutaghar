@@ -78,3 +78,30 @@ export async function sendOtpEmail({ to, subject, purpose, otp }) {
     html
   });
 }
+
+export async function sendAccountExistsEmail({ to }) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+    throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASSWORD.');
+  }
+
+  const subject = 'You already have a JutaGhar account';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="margin-bottom: 8px;">${subject}</h2>
+      <p style="margin-top: 0; color: #555;">
+        A sign-up attempt was made with this email address.
+      </p>
+      <p style="color: #555;">
+        If this is your account, please log in or use the forgot-password flow to reset your password.
+      </p>
+      <p style="color: #777; font-size: 12px;">If this wasn't you, you can safely ignore this email.</p>
+    </div>
+  `;
+
+  await getTransporter().sendMail({
+    from: getFromAddress(),
+    to,
+    subject,
+    html
+  });
+}

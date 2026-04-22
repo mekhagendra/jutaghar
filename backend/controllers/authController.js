@@ -7,7 +7,7 @@ import Order from '../models/Order.js';
 import Review from '../models/Review.js';
 import { hashPassword, comparePassword, generateToken, generateRefreshToken, verifyToken, generateMfaToken } from '../utils/auth.js';
 import logger from '../utils/logger.js';
-import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendOtpEmail } from '../utils/otpEmail.js';
+import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendOtpEmail, sendAccountExistsEmail } from '../utils/otpEmail.js';
 import { authenticator } from 'otplib';
 import qrcode from 'qrcode';
 import { encryptSecret, decryptSecret, generateRecoveryCodes, hashRecoveryCodes, findRecoveryCodeIndex } from '../utils/mfa.js';
@@ -106,13 +106,15 @@ export const requestRegisterOtp = async (req, res) => {
 
     const email = String(req.body.email).toLowerCase().trim();
     const { password, fullName, phone, affiliatedBy } = req.body;
+    const neutralResponse = {
+      success: true,
+      message: 'If the email is valid, a verification OTP has been sent.'
+    };
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email already exists'
-      });
+      await sendAccountExistsEmail({ to: email });
+      return res.json(neutralResponse);
     }
 
     const otp = generateOtp();
@@ -148,10 +150,7 @@ export const requestRegisterOtp = async (req, res) => {
       otp
     });
 
-    res.json({
-      success: true,
-      message: 'Verification OTP sent to your email.'
-    });
+    res.json(neutralResponse);
   } catch (error) {
     res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
