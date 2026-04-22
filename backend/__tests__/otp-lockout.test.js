@@ -165,7 +165,7 @@ describe('POST /api/auth/forgot-password/verify-otp — lockout', () => {
 
     const res = await request(app)
       .post('/api/auth/forgot-password/verify-otp')
-      .send({ email, otp: '0000', newPassword: 'newpass1' });
+        .send({ email, otp: '0000', newPassword: 'newP@ss001' });
 
     expect(res.status).toBe(400);
     expect(user.passwordReset.attempts).toBe(5);
@@ -180,7 +180,7 @@ describe('POST /api/auth/forgot-password/verify-otp — lockout', () => {
 
     const res = await request(app)
       .post('/api/auth/forgot-password/verify-otp')
-      .send({ email, otp: '0000', newPassword: 'newpass1' });
+        .send({ email, otp: '0000', newPassword: 'newP@ss001' });
 
     expect(res.status).toBe(429);
   });
@@ -192,7 +192,7 @@ describe('POST /api/auth/forgot-password/verify-otp — lockout', () => {
 
     const res = await request(app)
       .post('/api/auth/forgot-password/verify-otp')
-      .send({ email, otp: '123456', newPassword: 'newpass1' });
+        .send({ email, otp: '123456', newPassword: 'newP@ss001' });
 
     expect(res.status).toBe(200);
     expect(user.passwordReset.attempts).toBe(0);

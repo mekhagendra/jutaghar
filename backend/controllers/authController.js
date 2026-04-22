@@ -5,9 +5,12 @@ import PendingRegistration from '../models/PendingRegistration.js';
 import RefreshSession from '../models/RefreshSession.js';
 import Order from '../models/Order.js';
 import Review from '../models/Review.js';
-import { hashPassword, comparePassword, generateToken, generateRefreshToken, verifyToken } from '../utils/auth.js';
+import { hashPassword, comparePassword, generateToken, generateRefreshToken, verifyToken, generateMfaToken } from '../utils/auth.js';
 import logger from '../utils/logger.js';
 import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendOtpEmail } from '../utils/otpEmail.js';
+import { authenticator } from 'otplib';
+import qrcode from 'qrcode';
+import { encryptSecret, decryptSecret, generateRecoveryCodes, hashRecoveryCodes, findRecoveryCodeIndex } from '../utils/mfa.js';
 
 const REFRESH_COOKIE_NAME = 'jg_rt';
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -294,6 +297,12 @@ export const login = async (req, res) => {
         success: false,
         message: 'Please verify your email before login'
       });
+    }
+
+    // MFA gate for admin / outlet roles
+    if (['admin', 'manager', 'outlet'].includes(user.role) && user.mfa?.enabled) {
+      const mfa_token = generateMfaToken(user._id);
+      return res.json({ success: true, mfa_required: true, mfa_token });
     }
 
     // Generate tokens
@@ -882,6 +891,183 @@ export const deleteAccount = async (req, res) => {
     await User.findByIdAndDelete(userId);
 
     res.json({ success: true, message: 'Account and associated data deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
+  }
+};
+
+// ─── MFA endpoints ────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/auth/mfa/setup
+ * Generates a new TOTP secret and stores it temporarily (not yet enabled).
+ * Returns the otpauth URI and a QR code data URL.
+ */
+export const setupMfa = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const secret = authenticator.generateSecret();
+    const otpauthUri = authenticator.keyuri(user.email, 'JutaGhar', secret);
+    const qrDataUrl = await qrcode.toDataURL(otpauthUri);
+
+    // Store encrypted pending secret (not enabled until /mfa/verify succeeds)
+    user.mfa = user.mfa || {};
+    user.mfa.pendingSecret = encryptSecret(secret);
+    user.mfa.enabled = user.mfa.enabled || false;
+    await user.save();
+
+    res.json({ success: true, data: { otpauthUri, qrDataUrl } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
+  }
+};
+
+/**
+ * POST /api/auth/mfa/verify
+ * Verifies the first TOTP code; if valid, activates MFA and returns recovery codes.
+ */
+export const verifyMfaSetup = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!user.mfa?.pendingSecret) {
+      return res.status(400).json({ success: false, message: 'No MFA setup in progress. Call /mfa/setup first.' });
+    }
+
+    const { code } = req.body;
+    const secret = decryptSecret(user.mfa.pendingSecret);
+
+    if (!authenticator.check(String(code), secret)) {
+      return res.status(400).json({ success: false, message: 'Invalid TOTP code' });
+    }
+
+    // Activate MFA
+    const plainCodes = generateRecoveryCodes();
+    const hashedCodes = await hashRecoveryCodes(plainCodes);
+
+    user.mfa.secret = encryptSecret(secret);
+    user.mfa.pendingSecret = undefined;
+    user.mfa.enabled = true;
+    user.mfa.recoveryCodes = hashedCodes;
+    await user.save();
+
+    // Return plain codes once — never stored in plain text
+    res.json({ success: true, data: { recoveryCodes: plainCodes } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
+  }
+};
+
+/**
+ * POST /api/auth/mfa/disable
+ * Requires current password and a valid TOTP code (or recovery code).
+ */
+export const disableMfa = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!user.mfa?.enabled) {
+      return res.status(400).json({ success: false, message: 'MFA is not enabled' });
+    }
+
+    const { password, code } = req.body;
+
+    // Verify password
+    const passwordMatch = user.password ? await comparePassword(password, user.password) : false;
+    if (!passwordMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid password' });
+    }
+
+    // Verify TOTP code or recovery code
+    const secret = decryptSecret(user.mfa.secret);
+    const totpValid = authenticator.check(String(code), secret);
+
+    if (!totpValid) {
+      // Try recovery codes
+      const idx = await findRecoveryCodeIndex(String(code), user.mfa.recoveryCodes);
+      if (idx === -1) {
+        return res.status(400).json({ success: false, message: 'Invalid code' });
+      }
+      user.mfa.recoveryCodes.splice(idx, 1);
+    }
+
+    user.mfa.enabled = false;
+    user.mfa.secret = undefined;
+    user.mfa.recoveryCodes = [];
+    await user.save();
+
+    res.json({ success: true, message: 'MFA disabled successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
+  }
+};
+
+/**
+ * POST /api/auth/mfa/login-verify
+ * Second step of MFA login: accepts the short-lived mfa_token + TOTP code,
+ * then issues real access and refresh tokens.
+ */
+export const loginVerifyMfa = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { mfa_token, code } = req.body;
+
+    // Verify the short-lived MFA token
+    const decoded = verifyToken(mfa_token);
+    if (!decoded || decoded.purpose !== 'mfa') {
+      return res.status(401).json({ success: false, message: 'Invalid or expired MFA token' });
+    }
+
+    const user = await User.findById(decoded.id);
+    if (!user || !user.mfa?.enabled || !user.mfa?.secret) {
+      return res.status(401).json({ success: false, message: 'Invalid MFA state' });
+    }
+
+    const secret = decryptSecret(user.mfa.secret);
+    const totpValid = authenticator.check(String(code), secret);
+
+    if (!totpValid) {
+      // Try recovery codes
+      const idx = await findRecoveryCodeIndex(String(code), user.mfa.recoveryCodes);
+      if (idx === -1) {
+        return res.status(400).json({ success: false, message: 'Invalid code' });
+      }
+      // Consume the recovery code
+      user.mfa.recoveryCodes.splice(idx, 1);
+      await user.save();
+    }
+
+    // Issue real tokens
+    const accessToken = generateToken(user._id, user.role);
+    const { rawToken: refreshToken } = await createSession(user._id, req);
+    setRefreshCookie(res, refreshToken);
+
+    res.json({
+      success: true,
+      data: {
+        user: toAuthUser(user),
+        accessToken,
+        refreshToken
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }

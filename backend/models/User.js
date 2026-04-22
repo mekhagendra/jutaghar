@@ -37,7 +37,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    minlength: 6
+    minlength: 10
   },
   fullName: {
     type: String,
@@ -113,6 +113,13 @@ const userSchema = new mongoose.Schema({
   emailVerification: otpStateSchema,
   passwordReset: otpStateSchema,
   passwordChange: otpStateSchema,
+
+  mfa: {
+    enabled: { type: Boolean, default: false },
+    secret: { type: String },          // AES-256-GCM encrypted TOTP secret
+    pendingSecret: { type: String },   // temporary, cleared after verification
+    recoveryCodes: [{ type: String }], // bcrypt-hashed, one-time use
+  },
 
 }, {
   timestamps: true

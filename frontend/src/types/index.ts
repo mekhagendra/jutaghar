@@ -36,6 +36,7 @@ export interface User {
   affiliatedBy?: string;
   approvedAt?: string;
   approvedBy?: string;
+  mfa?: { enabled: boolean };
   createdAt: string;
   updatedAt: string;
 }

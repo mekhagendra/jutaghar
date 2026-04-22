@@ -4,20 +4,28 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { GoogleLogin } from '@react-oauth/google';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore, MfaRequiredError } from '@/stores/authStore';
 import { LogIn, Clock, Mail } from 'lucide-react';
 import api from '@/lib/api';
 
+const PASSWORD_POLICY = z
+  .string()
+  .min(10, 'Password must be at least 10 characters')
+  .regex(
+    /(?=.*\d)(?=.*[a-zA-Z])(?=.*[^a-zA-Z0-9])/,
+    'Password must include a letter, a digit, and a symbol'
+  );
+
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: PASSWORD_POLICY,
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, googleLogin } = useAuthStore();
+  const { login, googleLogin, mfaLoginVerify } = useAuthStore();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,6 +36,10 @@ const Login: React.FC = () => {
   const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
   const [forgotStep, setForgotStep] = useState<'request' | 'verify'>('request');
+
+  // MFA second-step state
+  const [mfaPending, setMfaPending] = useState<{ mfaToken: string } | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
 
   const {
     register,
@@ -45,6 +57,10 @@ const Login: React.FC = () => {
       await login(data.email, data.password);
       navigate('/');
     } catch (err: unknown) {
+      if (err instanceof MfaRequiredError) {
+        setMfaPending({ mfaToken: err.mfaToken });
+        return;
+      }
       const e = err as { response?: { data?: { message?: string } } };
       const msg = e.response?.data?.message || '';
       if (msg === 'Account is pending approval') {
@@ -52,6 +68,22 @@ const Login: React.FC = () => {
       } else {
         setError(msg || 'Login failed. Please try again.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfaVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaPending) return;
+    try {
+      setLoading(true);
+      setError('');
+      await mfaLoginVerify(mfaPending.mfaToken, mfaCode);
+      navigate('/');
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { message?: string } } };
+      setError(e2.response?.data?.message || 'Invalid code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -105,6 +137,37 @@ const Login: React.FC = () => {
       setLoading(false);
     }
   };
+
+  if (mfaPending) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
+        <div className="max-w-md w-full card">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Two-Factor Authentication</h2>
+          <p className="text-gray-500 mb-6 text-center">Enter the 6-digit code from your authenticator app.</p>
+          <form onSubmit={handleMfaVerify} className="space-y-4">
+            {error && <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg p-3 text-sm">{error}</div>}
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={8}
+              placeholder="6-digit code or recovery code"
+              value={mfaCode}
+              onChange={e => setMfaCode(e.target.value.replace(/\s/g, ''))}
+              className="input-field w-full text-center text-2xl tracking-widest"
+              autoFocus
+            />
+            <button type="submit" disabled={loading || mfaCode.length < 6} className="btn-primary w-full">
+              {loading ? 'Verifying…' : 'Verify'}
+            </button>
+            <button type="button" onClick={() => { setMfaPending(null); setMfaCode(''); setError(''); }} className="btn-secondary w-full">
+              Back to Login
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (pendingEmail) {
     return (

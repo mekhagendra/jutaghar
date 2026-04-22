@@ -35,6 +35,7 @@ const OrderDetail = lazy(() => import('@/pages/user/OrderDetail'));
 const UserOrders = lazy(() => import('@/pages/user/Orders'));
 const UserWishlist = lazy(() => import('@/pages/user/Wishlist'));
 const UserProfile = lazy(() => import('@/pages/user/Profile'));
+const MfaSetup = lazy(() => import('@/pages/user/MfaSetup'));
 
 // Admin pages
 const ManageCategories = lazy(() => import('@/pages/admin/ManageCategories'));
@@ -206,6 +207,7 @@ function App() {
             <Route path="/user/orders" element={<UserOrders />} />
             <Route path="/user/wishlist" element={<UserWishlist />} />
             <Route path="/user/profile" element={<UserProfile />} />
+            <Route path="/user/mfa" element={<MfaSetup />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
           </Route>
         </Routes>

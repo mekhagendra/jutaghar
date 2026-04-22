@@ -4,11 +4,26 @@ import type { User, AuthResponse } from '@/types';
 import api from '@/lib/api';
 import { clearAccessToken, setAccessToken } from '@/lib/authToken';
 
+/** Thrown by login() when the backend requires a second MFA step. */
+export class MfaRequiredError extends Error {
+  constructor(public readonly mfaToken: string) {
+    super('MFA_REQUIRED');
+    this.name = 'MfaRequiredError';
+  }
+}
+
+interface MfaLoginResponse {
+  success: boolean;
+  mfa_required: true;
+  mfa_token: string;
+}
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  mfaLoginVerify: (mfaToken: string, code: string) => Promise<void>;
   googleLogin: (credential: string) => Promise<void>;
   requestSignupOtp: (data: Record<string, unknown>) => Promise<void>;
   verifySignupOtp: (email: string, otp: string) => Promise<void>;
@@ -24,9 +39,29 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       login: async (email: string, password: string) => {
-        const response = await api.post<{ success: boolean; data: AuthResponse }>('/api/auth/login', {
+        const response = await api.post<{ success: boolean; data?: AuthResponse } & Partial<MfaLoginResponse>>('/api/auth/login', {
           email,
           password,
+        });
+
+        if (response.data.mfa_required) {
+          throw new MfaRequiredError(response.data.mfa_token!);
+        }
+
+        const { user, accessToken } = response.data.data!;
+        setAccessToken(accessToken);
+
+        set({
+          user,
+          accessToken,
+          isAuthenticated: true,
+        });
+      },
+
+      mfaLoginVerify: async (mfaToken: string, code: string) => {
+        const response = await api.post<{ success: boolean; data: AuthResponse }>('/api/auth/mfa/login-verify', {
+          mfa_token: mfaToken,
+          code,
         });
 
         const { user, accessToken } = response.data.data;

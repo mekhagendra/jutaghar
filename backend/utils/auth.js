@@ -39,3 +39,12 @@ export const hashPassword = async (password) => {
 export const comparePassword = async (password, hashedPassword) => {
   return bcrypt.compare(password, hashedPassword);
 };
+
+// Generate short-lived MFA challenge token (5 min, purpose: 'mfa')
+export const generateMfaToken = (userId) => {
+  return jwt.sign(
+    { id: userId, purpose: 'mfa' },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' }
+  );
+};

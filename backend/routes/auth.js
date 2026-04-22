@@ -12,9 +12,13 @@ import {
 const router = express.Router();
 
 // Validation rules
+const PASSWORD_COMPLEXITY = /(?=.*\d)(?=.*[a-zA-Z])(?=.*[^a-zA-Z0-9])/;
+const PASSWORD_MESSAGE = 'Password must be at least 10 characters and include a letter, digit, and symbol';
+
 const registerValidation = [
   body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 }),
+  body('password').isLength({ min: 10 }).withMessage(PASSWORD_MESSAGE)
+    .matches(PASSWORD_COMPLEXITY).withMessage(PASSWORD_MESSAGE),
   body('fullName').trim().notEmpty(),
   body('phone').trim().notEmpty()
 ];
@@ -27,12 +31,14 @@ const verifyOtpValidation = [
 const forgotPasswordVerifyValidation = [
   body('email').isEmail().normalizeEmail(),
   body('otp').isLength({ min: 4, max: 8 }).trim(),
-  body('newPassword').isLength({ min: 6 })
+  body('newPassword').isLength({ min: 10 }).withMessage(PASSWORD_MESSAGE)
+    .matches(PASSWORD_COMPLEXITY).withMessage(PASSWORD_MESSAGE)
 ];
 
 const requestChangePasswordValidation = [
-  body('currentPassword').isLength({ min: 6 }),
-  body('newPassword').isLength({ min: 6 })
+  body('currentPassword').notEmpty(),
+  body('newPassword').isLength({ min: 10 }).withMessage(PASSWORD_MESSAGE)
+    .matches(PASSWORD_COMPLEXITY).withMessage(PASSWORD_MESSAGE)
 ];
 
 const verifyChangePasswordValidation = [
@@ -71,5 +77,20 @@ router.post('/vendor-request', authenticate, authController.requestVendor);
 // Admin: manage vendor requests
 router.get('/vendor-requests', authenticate, requireAdmin, authController.getVendorRequests);
 router.patch('/vendor-requests/:id', authenticate, requireAdmin, authController.reviewVendorRequest);
+
+// MFA routes
+const mfaDisableValidation = [
+  body('password').notEmpty(),
+  body('code').notEmpty()
+];
+const mfaLoginVerifyValidation = [
+  body('mfa_token').notEmpty(),
+  body('code').notEmpty()
+];
+
+router.post('/mfa/setup', authenticate, authController.setupMfa);
+router.post('/mfa/verify', authenticate, [body('code').notEmpty()], authController.verifyMfaSetup);
+router.post('/mfa/disable', authenticate, mfaDisableValidation, authController.disableMfa);
+router.post('/mfa/login-verify', authLimiter, mfaLoginVerifyValidation, authController.loginVerifyMfa);
 
 export default router;
