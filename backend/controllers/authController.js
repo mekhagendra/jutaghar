@@ -1,26 +1,107 @@
 import { validationResult } from 'express-validator';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
+import PendingRegistration from '../models/PendingRegistration.js';
+import RefreshSession from '../models/RefreshSession.js';
 import Order from '../models/Order.js';
 import Review from '../models/Review.js';
 import { hashPassword, comparePassword, generateToken, generateRefreshToken, verifyToken } from '../utils/auth.js';
+import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendOtpEmail } from '../utils/otpEmail.js';
+
+const REFRESH_COOKIE_NAME = 'jg_rt';
+const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function getRefreshCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    path: '/api/auth/refresh',
+    maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+  };
+}
+
+function setRefreshCookie(res, refreshToken) {
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions());
+}
+
+function clearRefreshCookie(res) {
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    path: '/api/auth/refresh',
+  });
+}
+
+function parseCookies(cookieHeader = '') {
+  const parsed = {};
+  for (const item of cookieHeader.split(';')) {
+    const [rawKey, ...valueParts] = item.split('=');
+    const key = rawKey?.trim();
+    if (!key) continue;
+    parsed[key] = decodeURIComponent(valueParts.join('=').trim());
+  }
+  return parsed;
+}
+
+function getRefreshTokenFromRequest(req) {
+  const cookies = parseCookies(req.headers?.cookie || '');
+  return cookies[REFRESH_COOKIE_NAME] || req.body?.refreshToken || null;
+}
+
+/** Helper: create a RefreshSession and return the signed token */
+async function createSession(userId, req) {
+  const session = await RefreshSession.create({
+    userId,
+    hashedToken: 'pending', // replaced once token is signed
+    deviceId: req.headers['x-device-id'] || null,
+    userAgent: req.headers['user-agent'] || null,
+    ip: req.ip || null
+  });
+  const rawToken = generateRefreshToken(userId, session._id);
+  session.hashedToken = RefreshSession.hashToken(rawToken);
+  await session.save();
+  return { session, rawToken };
+}
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Register new user
-export const register = async (req, res) => {
+function toAuthUser(user) {
+  return {
+    id: user._id,
+    _id: user._id,
+    email: user.email,
+    fullName: user.fullName,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    businessName: user.businessName,
+    avatar: user.avatar,
+    vendorRequest: user.vendorRequest,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  };
+}
+
+// Register is blocked unless OTP verification is completed.
+export const register = async (_req, res) => {
+  return res.status(400).json({
+    success: false,
+    message: 'Email verification is required before registration. Use /api/auth/register/request-otp and /api/auth/register/verify-otp.'
+  });
+};
+
+export const requestRegisterOtp = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array()
-      });
+      return res.status(400).json({ success: false, errors: errors.array() });
     }
 
-    const { email, password, fullName, phone, affiliatedBy } = req.body;
+    const email = String(req.body.email).toLowerCase().trim();
+    const { password, fullName, phone, affiliatedBy } = req.body;
 
-    // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -29,61 +110,135 @@ export const register = async (req, res) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await hashPassword(password);
+    const otp = generateOtp();
+    const otpHash = hashOtp(otp);
+    const otpExpiresAt = getOtpExpiryDate();
+    const passwordHash = await hashPassword(password);
 
-    // All registrations create a regular user with active status
-    const userData = {
-      email,
-      password: hashedPassword,
+    const update = {
       fullName,
       phone,
-      role: 'user',
-      status: 'active'
+      passwordHash,
+      otpHash,
+      otpExpiresAt
     };
 
-    // Add affiliation
     if (affiliatedBy) {
       const parentUser = await User.findById(affiliatedBy);
       if (parentUser) {
-        userData.affiliatedBy = affiliatedBy;
-        userData.affiliations = [{
-          parentId: affiliatedBy,
-          level: 1,
-          commissionRate: 5 // Default 5%
-        }];
+        update.affiliatedBy = affiliatedBy;
       }
     }
 
+    await PendingRegistration.findOneAndUpdate(
+      { email },
+      { email, ...update },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    await sendOtpEmail({
+      to: email,
+      subject: 'Verify your JutaGhar account',
+      purpose: 'your account registration',
+      otp
+    });
+
+    res.json({
+      success: true,
+      message: 'Verification OTP sent to your email.'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const verifyRegisterOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const email = String(req.body.email).toLowerCase().trim();
+    const otp = String(req.body.otp).trim();
+
+    const pendingRegistration = await PendingRegistration.findOne({ email });
+    if (!pendingRegistration) {
+      return res.status(400).json({
+        success: false,
+        message: 'No pending registration found for this email'
+      });
+    }
+
+    if (isOtpExpired(pendingRegistration.otpExpiresAt)) {
+      await PendingRegistration.deleteOne({ _id: pendingRegistration._id });
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    // Lockout check
+    if (pendingRegistration.lockedUntil && pendingRegistration.lockedUntil > new Date()) {
+      return res.status(429).json({ success: false, message: 'Too many incorrect OTP attempts. Try again in 15 minutes.' });
+    }
+
+    if (pendingRegistration.otpHash !== hashOtp(otp)) {
+      pendingRegistration.attempts = (pendingRegistration.attempts || 0) + 1;
+      if (pendingRegistration.attempts >= 5) {
+        pendingRegistration.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+      }
+      await pendingRegistration.save();
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    // Correct OTP — reset counters
+    pendingRegistration.attempts = 0;
+    pendingRegistration.lockedUntil = null;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      await PendingRegistration.deleteOne({ _id: pendingRegistration._id });
+      return res.status(400).json({ success: false, message: 'User with this email already exists' });
+    }
+
+    const userData = {
+      email,
+      password: pendingRegistration.passwordHash,
+      fullName: pendingRegistration.fullName,
+      phone: pendingRegistration.phone,
+      role: 'user',
+      status: 'active',
+      emailVerified: true,
+      emailVerification: {
+        otpHash: null,
+        otpExpiresAt: null,
+        pendingPassword: null
+      }
+    };
+
+    if (pendingRegistration.affiliatedBy) {
+      userData.affiliatedBy = pendingRegistration.affiliatedBy;
+      userData.affiliations = [{
+        parentId: pendingRegistration.affiliatedBy,
+        level: 1,
+        commissionRate: 5
+      }];
+    }
+
     const user = await User.create(userData);
-
-    // Generate tokens
     const accessToken = generateToken(user._id, user.role);
-    const refreshToken = generateRefreshToken(user._id);
-
-    // Save refresh token
-    user.refreshToken = refreshToken;
-    await user.save();
+    const { rawToken: refreshToken } = await createSession(user._id, req);
+    setRefreshCookie(res, refreshToken);
+    await PendingRegistration.deleteOne({ _id: pendingRegistration._id });
 
     res.status(201).json({
       success: true,
       data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          status: user.status
-        },
+        user: toAuthUser(user),
         accessToken,
         refreshToken
       }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -133,25 +288,22 @@ export const login = async (req, res) => {
       });
     }
 
+    if (user.emailVerified === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email before login'
+      });
+    }
+
     // Generate tokens
     const accessToken = generateToken(user._id, user.role);
-    const refreshToken = generateRefreshToken(user._id);
-
-    // Save refresh token
-    user.refreshToken = refreshToken;
-    await user.save();
+    const { rawToken: refreshToken } = await createSession(user._id, req);
+    setRefreshCookie(res, refreshToken);
 
     res.json({
       success: true,
       data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          status: user.status,
-          businessName: user.businessName
-        },
+        user: toAuthUser(user),
         accessToken,
         refreshToken
       }
@@ -167,38 +319,59 @@ export const login = async (req, res) => {
 // Refresh token
 export const refreshToken = async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    const rawToken = getRefreshTokenFromRequest(req);
 
-    if (!refreshToken) {
+    if (!rawToken) {
       return res.status(400).json({
         success: false,
         message: 'Refresh token required'
       });
     }
 
-    const decoded = verifyToken(refreshToken);
-    if (!decoded) {
+    const decoded = verifyToken(rawToken);
+    if (!decoded || !decoded.sid) {
       return res.status(401).json({
         success: false,
         message: 'Invalid refresh token'
       });
     }
 
-    const user = await User.findById(decoded.id);
-    if (!user || user.refreshToken !== refreshToken) {
+    const hashedToken = RefreshSession.hashToken(rawToken);
+    const session = await RefreshSession.findOne({ _id: decoded.sid, hashedToken });
+
+    if (!session) {
       return res.status(401).json({
         success: false,
         message: 'Invalid refresh token'
       });
     }
 
-    // Generate new tokens
+    // ── Reuse detection ──────────────────────────────────────────────────────
+    if (session.revokedAt) {
+      await RefreshSession.updateMany(
+        { userId: session.userId, revokedAt: null },
+        { revokedAt: new Date() }
+      );
+      console.error(`[SECURITY] Refresh token reuse detected for user ${session.userId}. All sessions revoked.`);
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token already used. All sessions have been revoked for security.'
+      });
+    }
+
+    const user = await User.findById(session.userId);
+    if (!user || user.status !== 'active') {
+      return res.status(401).json({ success: false, message: 'User not found or inactive' });
+    }
+
+    // ── Rotate: revoke old, create new ──────────────────────────────────────
+    const { session: newSession, rawToken: newRefreshToken } = await createSession(user._id, req);
+    session.revokedAt = new Date();
+    session.replacedBy = newSession._id;
+    await session.save();
+    setRefreshCookie(res, newRefreshToken);
+
     const newAccessToken = generateToken(user._id, user.role);
-    const newRefreshToken = generateRefreshToken(user._id);
-
-    // Update refresh token
-    user.refreshToken = newRefreshToken;
-    await user.save();
 
     res.json({
       success: true,
@@ -218,7 +391,7 @@ export const refreshToken = async (req, res) => {
 // Get current user
 export const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password -refreshToken');
+    const user = await User.findById(req.user._id).select('-password -passwordReset -passwordChange -emailVerification');
     
     res.json({
       success: true,
@@ -235,8 +408,17 @@ export const getCurrentUser = async (req, res) => {
 // Logout
 export const logout = async (req, res) => {
   try {
-    await User.findByIdAndUpdate(req.user._id, { refreshToken: null });
-    
+    const rawToken = getRefreshTokenFromRequest(req);
+    if (rawToken) {
+      const decoded = verifyToken(rawToken);
+      if (decoded?.sid) {
+        await RefreshSession.findOneAndUpdate(
+          { _id: decoded.sid, userId: req.user._id, revokedAt: null },
+          { revokedAt: new Date() }
+        );
+      }
+    }
+    clearRefreshCookie(res);
     res.json({
       success: true,
       message: 'Logged out successfully'
@@ -246,6 +428,210 @@ export const logout = async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { fullName, phone } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { fullName, phone },
+      { new: true, runValidators: true }
+    ).select('-password -passwordReset -passwordChange -emailVerification');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({ success: true, data: user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const requestForgotPasswordOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const email = String(req.body.email).toLowerCase().trim();
+    const user = await User.findOne({ email });
+
+    if (!user || !user.password) {
+      return res.json({
+        success: true,
+        message: 'If your email is registered, OTP instructions have been sent.'
+      });
+    }
+
+    const otp = generateOtp();
+    user.passwordReset = {
+      otpHash: hashOtp(otp),
+      otpExpiresAt: getOtpExpiryDate(),
+      pendingPassword: null
+    };
+    await user.save();
+
+    await sendOtpEmail({
+      to: user.email,
+      subject: 'Reset your JutaGhar password',
+      purpose: 'your password reset',
+      otp
+    });
+
+    res.json({
+      success: true,
+      message: 'If your email is registered, OTP instructions have been sent.'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const verifyForgotPasswordOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const email = String(req.body.email).toLowerCase().trim();
+    const otp = String(req.body.otp).trim();
+    const newPassword = String(req.body.newPassword);
+
+    const user = await User.findOne({ email });
+    if (!user || !user.passwordReset?.otpHash) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP request' });
+    }
+
+    if (isOtpExpired(user.passwordReset.otpExpiresAt)) {
+      user.passwordReset = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
+      await user.save();
+      return res.status(400).json({ success: false, message: 'OTP has expired. Request a new one.' });
+    }
+
+    // Lockout check
+    if (user.passwordReset.lockedUntil && user.passwordReset.lockedUntil > new Date()) {
+      return res.status(429).json({ success: false, message: 'Too many incorrect OTP attempts. Try again in 15 minutes.' });
+    }
+
+    if (user.passwordReset.otpHash !== hashOtp(otp)) {
+      user.passwordReset.attempts = (user.passwordReset.attempts || 0) + 1;
+      if (user.passwordReset.attempts >= 5) {
+        user.passwordReset.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+      }
+      await user.save();
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    // Correct OTP — reset counters and update password
+    user.password = await hashPassword(newPassword);
+    user.passwordReset = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully. Please login with your new password.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const requestChangePasswordOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password change is not available for this account. Use Google sign-in account settings.'
+      });
+    }
+
+    const isMatch = await comparePassword(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ success: false, message: 'New password must be different from current password' });
+    }
+
+    const otp = generateOtp();
+    user.passwordChange = {
+      otpHash: hashOtp(otp),
+      otpExpiresAt: getOtpExpiryDate(),
+      pendingPassword: await hashPassword(newPassword)
+    };
+    await user.save();
+
+    await sendOtpEmail({
+      to: user.email,
+      subject: 'Confirm password change for JutaGhar',
+      purpose: 'your password change',
+      otp
+    });
+
+    res.json({ success: true, message: 'OTP sent to your email for password change confirmation.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const verifyChangePasswordOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const otp = String(req.body.otp).trim();
+    const user = await User.findById(req.user._id);
+
+    if (!user || !user.passwordChange?.otpHash || !user.passwordChange?.pendingPassword) {
+      return res.status(400).json({ success: false, message: 'No pending password change request found' });
+    }
+
+    if (isOtpExpired(user.passwordChange.otpExpiresAt)) {
+      user.passwordChange = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
+      await user.save();
+      return res.status(400).json({ success: false, message: 'OTP has expired. Request a new one.' });
+    }
+
+    // Lockout check
+    if (user.passwordChange.lockedUntil && user.passwordChange.lockedUntil > new Date()) {
+      return res.status(429).json({ success: false, message: 'Too many incorrect OTP attempts. Try again in 15 minutes.' });
+    }
+
+    if (user.passwordChange.otpHash !== hashOtp(otp)) {
+      user.passwordChange.attempts = (user.passwordChange.attempts || 0) + 1;
+      if (user.passwordChange.attempts >= 5) {
+        user.passwordChange.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+      }
+      await user.save();
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    // Correct OTP — reset counters and apply pending password
+    user.password = user.passwordChange.pendingPassword;
+    user.passwordChange = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
+    await user.save();
+
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -296,6 +682,7 @@ export const googleLogin = async (req, res) => {
         avatar: picture,
         role: 'user',
         status: 'active',
+        emailVerified: true,
       });
     }
 
@@ -316,23 +703,13 @@ export const googleLogin = async (req, res) => {
 
     // Generate tokens
     const accessToken = generateToken(user._id, user.role);
-    const refreshToken = generateRefreshToken(user._id);
-
-    user.refreshToken = refreshToken;
-    await user.save();
+    const { rawToken: refreshToken } = await createSession(user._id, req);
+    setRefreshCookie(res, refreshToken);
 
     res.json({
       success: true,
       data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          status: user.status,
-          businessName: user.businessName,
-          avatar: user.avatar,
-        },
+        user: toAuthUser(user),
         accessToken,
         refreshToken
       }
@@ -456,7 +833,7 @@ export const getVendorRequests = async (req, res) => {
   try {
     const users = await User.find({
       'vendorRequest.status': 'pending'
-    }).select('-password -refreshToken').sort('-vendorRequest.requestedAt');
+    }).select('-password -passwordReset -passwordChange -emailVerification').sort('-vendorRequest.requestedAt');
 
     res.json({
       success: true,

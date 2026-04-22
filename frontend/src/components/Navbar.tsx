@@ -37,6 +37,13 @@ interface Category {
   productCount?: number;
 }
 
+interface AccountAction {
+  label: string;
+  to?: string;
+  onClick?: () => void;
+  danger?: boolean;
+}
+
 const Navbar: React.FC = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -60,13 +67,38 @@ const Navbar: React.FC = () => {
   const [trackResult, setTrackResult] = useState<TrackResult | null>(null);
   const [trackError, setTrackError] = useState('');
   const trackInputRef = useRef<HTMLInputElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
     setOpenMobileDropdown(null);
     setWishlistOpen(false);
+    setAccountMenuOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   // Reset selection when drawer opens/closes
   useEffect(() => {
@@ -232,12 +264,39 @@ const Navbar: React.FC = () => {
     ];
   }, [allCategories, menCategories, womenCategories, kidsCategories]);
 
-  const getDashboardPath = () => {
-    if (!user) return '/login';
-    if (['admin', 'manager'].includes(user.role)) return '/admin/dashboard';
-    if (['outlet'].includes(user.role)) return '/vendor/dashboard';
-    return '/dashboard';
-  };
+  const accountActions: AccountAction[] = useMemo(() => {
+    if (!isAuthenticated || !user) {
+      return [{ label: 'Login', to: '/login' }];
+    }
+
+    const commonActions: AccountAction[] = [
+      { label: 'Account Info', to: '/user/profile' },
+      { label: 'Change Password', to: '/user/profile#change-password' },
+    ];
+
+    const roleActions: AccountAction[] = ['admin', 'manager'].includes(user.role)
+      ? [
+          { label: 'Admin Dashboard', to: '/admin/dashboard' },
+          { label: 'Manage Users', to: '/admin/users' },
+        ]
+      : user.role === 'outlet'
+      ? [
+          { label: 'Vendor Dashboard', to: '/vendor/dashboard' },
+          { label: 'Manage Products', to: '/products/manage' },
+          { label: 'Vendor Orders', to: '/vendor/orders' },
+        ]
+      : [
+          { label: 'My Dashboard', to: '/user/dashboard' },
+          { label: 'My Orders', to: '/user/orders' },
+          { label: 'Wishlist', to: '/user/wishlist' },
+        ];
+
+    return [
+      ...commonActions,
+      ...roleActions,
+      { label: 'Logout', onClick: logout, danger: true },
+    ];
+  }, [isAuthenticated, logout, user]);
 
   const trackStatusSteps = [
     { key: 'pending', label: 'Placed', icon: Clock },
@@ -351,26 +410,48 @@ const Navbar: React.FC = () => {
 
             {/* User Menu */}
             {isAuthenticated ? (
-              <div className="relative group">
-                <button className="flex items-center gap-2 hover:text-primary-600 transition-colors">
+              <div className="relative" ref={accountMenuRef}>
+                <button
+                  onClick={() => setAccountMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 hover:text-primary-600 transition-colors"
+                  aria-expanded={accountMenuOpen}
+                  aria-haspopup="menu"
+                >
                   <User className="w-6 h-6" />
                   <span className="hidden md:block text-sm font-medium">{user?.fullName}</span>
-                  <ChevronDown className="w-4 h-4 hidden md:block" />
+                  <ChevronDown className={`w-4 h-4 hidden md:block transition-transform ${accountMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                  <Link
-                    to={getDashboardPath()}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-600"
-                  >
-                    Dashboard
-                  </Link>
-                  <button
-                    onClick={logout}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    Logout
-                  </button>
-                </div>
+                {accountMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-2 border border-gray-100 z-[120]">
+                    {accountActions.map((action) => {
+                      if (action.to) {
+                        return (
+                          <Link
+                            key={action.label}
+                            to={action.to}
+                            onClick={() => setAccountMenuOpen(false)}
+                            className={`block px-4 py-2 text-sm transition-colors ${action.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-primary-50 hover:text-primary-600'}`}
+                          >
+                            {action.label}
+                          </Link>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={action.label}
+                          onClick={() => {
+                            action.onClick?.();
+                            setAccountMenuOpen(false);
+                          }}
+                          className={`block w-full text-left px-4 py-2 text-sm transition-colors ${action.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-primary-50 hover:text-primary-600'}`}
+                        >
+                          {action.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -437,6 +518,49 @@ const Navbar: React.FC = () => {
                 )}
               </div>
             ))}
+
+            {isAuthenticated ? (
+              <div className="pt-3 mt-2 border-t border-gray-200 space-y-1">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Account</p>
+                {accountActions.map((action) => {
+                  if (action.to) {
+                    return (
+                      <Link
+                        key={action.label}
+                        to={action.to}
+                        className={`block py-2 text-sm font-medium transition-colors ${action.danger ? 'text-red-600 hover:text-red-700' : 'text-gray-700 hover:text-primary-600'}`}
+                        onClick={() => handleMobileNavigation()}
+                      >
+                        {action.label}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={action.label}
+                      onClick={() => {
+                        action.onClick?.();
+                        handleMobileNavigation();
+                      }}
+                      className={`block w-full text-left py-2 text-sm font-medium transition-colors ${action.danger ? 'text-red-600 hover:text-red-700' : 'text-gray-700 hover:text-primary-600'}`}
+                    >
+                      {action.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="pt-3 mt-2 border-t border-gray-200">
+                <Link
+                  to="/login"
+                  className="block py-2 text-sm font-medium text-gray-700 hover:text-primary-600"
+                  onClick={() => handleMobileNavigation()}
+                >
+                  Login
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

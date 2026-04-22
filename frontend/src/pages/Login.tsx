@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '@/stores/authStore';
 import { LogIn, Clock, Mail } from 'lucide-react';
+import api from '@/lib/api';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -18,8 +19,15 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login, googleLogin } = useAuthStore();
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotStep, setForgotStep] = useState<'request' | 'verify'>('request');
 
   const {
     register,
@@ -33,6 +41,7 @@ const Login: React.FC = () => {
     try {
       setLoading(true);
       setError('');
+      setSuccess('');
       await login(data.email, data.password);
       navigate('/');
     } catch (err: unknown) {
@@ -43,6 +52,55 @@ const Login: React.FC = () => {
       } else {
         setError(msg || 'Login failed. Please try again.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      await api.post('/api/auth/forgot-password/request-otp', { email: forgotEmail });
+      setForgotStep('verify');
+      setSuccess('If this email is registered, an OTP has been sent.');
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { message?: string } } };
+      setError(e2.response?.data?.message || 'Failed to request OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      await api.post('/api/auth/forgot-password/verify-otp', {
+        email: forgotEmail,
+        otp: forgotOtp,
+        newPassword: forgotNewPassword,
+      });
+      setSuccess('Password reset successful. You can now sign in with your new password.');
+      setShowForgotPassword(false);
+      setForgotStep('request');
+      setForgotOtp('');
+      setForgotNewPassword('');
+      setForgotConfirmPassword('');
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { message?: string } } };
+      setError(e2.response?.data?.message || 'Failed to verify OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -102,6 +160,86 @@ const Login: React.FC = () => {
           </div>
         )}
 
+        {success && (
+          <div className="bg-green-50 text-green-700 p-4 rounded-lg mb-6 text-sm">
+            {success}
+          </div>
+        )}
+
+        {showForgotPassword ? (
+          <div className="mb-6 border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Reset Your Password</h3>
+
+            {forgotStep === 'request' ? (
+              <form onSubmit={handleForgotRequest} className="space-y-3">
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="input"
+                  placeholder="Enter your email"
+                  required
+                />
+                <button type="submit" disabled={loading} className="w-full btn btn-primary">
+                  {loading ? 'Sending OTP...' : 'Confirm'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleForgotVerify} className="space-y-3">
+                <input
+                  type="text"
+                  value={forgotOtp}
+                  onChange={(e) => setForgotOtp(e.target.value)}
+                  className="input"
+                  placeholder="Enter OTP"
+                  required
+                />
+                <input
+                  type="password"
+                  value={forgotNewPassword}
+                  onChange={(e) => setForgotNewPassword(e.target.value)}
+                  className="input"
+                  placeholder="New password"
+                  minLength={6}
+                  required
+                />
+                <input
+                  type="password"
+                  value={forgotConfirmPassword}
+                  onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                  className="input"
+                  placeholder="Confirm new password"
+                  minLength={6}
+                  required
+                />
+                <button type="submit" disabled={loading} className="w-full btn btn-primary">
+                  {loading ? 'Resetting...' : 'Verify OTP & Reset'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForgotStep('request')}
+                  className="w-full text-sm text-primary-700 hover:underline"
+                >
+                  Request new OTP
+                </button>
+              </form>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotPassword(false);
+                setForgotStep('request');
+              }}
+              className="w-full text-sm text-gray-600 hover:text-gray-800 mt-3"
+            >
+              Back to login
+            </button>
+          </div>
+        ) : null}
+
+        {!showForgotPassword && (
+        <>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -131,6 +269,20 @@ const Login: React.FC = () => {
             {errors.password && (
               <p className="text-red-600 text-sm mt-1">{errors.password.message}</p>
             )}
+            <div className="mt-2 text-right">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(true);
+                  setError('');
+                  setSuccess('');
+                  setForgotEmail((prev) => prev || '');
+                }}
+                className="text-sm text-primary-600 hover:text-primary-700"
+              >
+                Forgot password?
+              </button>
+            </div>
           </div>
 
           <button
@@ -190,6 +342,8 @@ const Login: React.FC = () => {
             </Link>
           </p>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

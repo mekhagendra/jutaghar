@@ -1,20 +1,25 @@
 import Review from '../models/Review.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
+import { asNumber, asObjectId, asString, stripOperators } from '../utils/sanitizeInput.js';
+
+const errorStatus = (error) => error?.statusCode || 500;
 
 // GET /api/reviews/product/:productId  — public, paginated
 export const getProductReviews = async (req, res) => {
   try {
-    const { productId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const productId = asObjectId(req.params.productId);
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 10)));
+    const skip = (page - 1) * limit;
 
     const [reviews, total] = await Promise.all([
       Review.find({ product: productId })
         .populate('user', 'fullName')
         .sort('-createdAt')
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(limit),
       Review.countDocuments({ product: productId }),
     ]);
 
@@ -23,15 +28,15 @@ export const getProductReviews = async (req, res) => {
       data: {
         reviews,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / parseInt(limit)),
+          pages: Math.ceil(total / limit),
         },
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: error.message });
   }
 };
 
@@ -39,7 +44,7 @@ export const getProductReviews = async (req, res) => {
 // Returns whether the logged-in user can review + any existing review
 export const canReview = async (req, res) => {
   try {
-    const { productId } = req.params;
+    const productId = asObjectId(req.params.productId);
     const userId = req.user._id;
 
     // Check delivered order containing this product
@@ -66,21 +71,25 @@ export const canReview = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: error.message });
   }
 };
 
 // POST /api/reviews  — auth required, customer only
 export const createReview = async (req, res) => {
   try {
-    const { productId, rating, comment } = req.body;
+    const sanitizedBody = stripOperators({ ...req.body });
+    const productIdRaw = sanitizedBody.productId;
+    const ratingRaw = sanitizedBody.rating;
+    const commentRaw = sanitizedBody.comment;
     const userId = req.user._id;
 
-    if (!productId || !rating) {
+    if (!productIdRaw || !ratingRaw) {
       return res.status(400).json({ success: false, message: 'productId and rating are required' });
     }
 
-    const ratingNum = parseInt(rating);
+    const productId = asObjectId(productIdRaw);
+    const ratingNum = asNumber(ratingRaw, 0);
     if (ratingNum < 1 || ratingNum > 5) {
       return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
     }
@@ -110,7 +119,7 @@ export const createReview = async (req, res) => {
       user: userId,
       order: order._id,
       rating: ratingNum,
-      comment: comment?.trim() || '',
+      comment: commentRaw ? asString(commentRaw).trim() : '',
     });
 
     // Recalculate product rating
@@ -133,14 +142,14 @@ export const createReview = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'You have already reviewed this product' });
     }
-    res.status(500).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: error.message });
   }
 };
 
 // DELETE /api/reviews/:id  — auth required, owner or admin
 export const deleteReview = async (req, res) => {
   try {
-    const review = await Review.findById(req.params.id);
+    const review = await Review.findById(asObjectId(req.params.id));
     if (!review) {
       return res.status(404).json({ success: false, message: 'Review not found' });
     }
@@ -168,6 +177,6 @@ export const deleteReview = async (req, res) => {
 
     res.json({ success: true, message: 'Review deleted' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: error.message });
   }
 };

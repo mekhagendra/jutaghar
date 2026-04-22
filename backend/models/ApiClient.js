@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 const apiClientSchema = new mongoose.Schema({
   name: {
@@ -79,20 +80,17 @@ apiClientSchema.statics.generateCredentials = function() {
   return { clientId, clientSecret };
 };
 
-// Hash client secret before saving
+// Hash client secret before saving (bcrypt, work-factor 12)
 apiClientSchema.pre('save', async function(next) {
   if (this.isModified('clientSecret')) {
-    const crypto = await import('crypto');
-    this.clientSecret = crypto.createHash('sha256').update(this.clientSecret).digest('hex');
+    this.clientSecret = await bcrypt.hash(this.clientSecret, 12);
   }
   next();
 });
 
-// Method to verify client secret
-apiClientSchema.methods.verifySecret = function(secret) {
-  const crypto = require('crypto');
-  const hashedSecret = crypto.createHash('sha256').update(secret).digest('hex');
-  return this.clientSecret === hashedSecret;
+// Timing-safe secret verification via bcrypt.compare
+apiClientSchema.methods.verifySecret = async function(secret) {
+  return bcrypt.compare(secret, this.clientSecret);
 };
 
 // Index for better query performance

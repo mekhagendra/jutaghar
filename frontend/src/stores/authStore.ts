@@ -2,15 +2,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, AuthResponse } from '@/types';
 import api from '@/lib/api';
+import { clearAccessToken, setAccessToken } from '@/lib/authToken';
 
 interface AuthState {
   user: User | null;
   accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   googleLogin: (credential: string) => Promise<void>;
-  register: (data: Record<string, unknown>) => Promise<void>;
+  requestSignupOtp: (data: Record<string, unknown>) => Promise<void>;
+  verifySignupOtp: (email: string, otp: string) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -20,7 +21,6 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
 
       login: async (email: string, password: string) => {
@@ -29,15 +29,12 @@ export const useAuthStore = create<AuthState>()(
           password,
         });
 
-        const { user, accessToken, refreshToken } = response.data.data;
-
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
+        const { user, accessToken } = response.data.data;
+        setAccessToken(accessToken);
 
         set({
           user,
           accessToken,
-          refreshToken,
           isAuthenticated: true,
         });
       },
@@ -47,45 +44,43 @@ export const useAuthStore = create<AuthState>()(
           credential,
         });
 
-        const { user, accessToken, refreshToken } = response.data.data;
-
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
+        const { user, accessToken } = response.data.data;
+        setAccessToken(accessToken);
 
         set({
           user,
           accessToken,
-          refreshToken,
           isAuthenticated: true,
         });
       },
 
-      register: async (data: Record<string, unknown>) => {
-        const response = await api.post<{ success: boolean; data: AuthResponse }>('/api/auth/register', data);
+      requestSignupOtp: async (data: Record<string, unknown>) => {
+        await api.post('/api/auth/register/request-otp', data);
+      },
 
-        const { user, accessToken, refreshToken } = response.data.data;
+      verifySignupOtp: async (email: string, otp: string) => {
+        const response = await api.post<{ success: boolean; data: AuthResponse }>('/api/auth/register/verify-otp', {
+          email,
+          otp,
+        });
 
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
+        const { user, accessToken } = response.data.data;
+        setAccessToken(accessToken);
 
         set({
           user,
           accessToken,
-          refreshToken,
           isAuthenticated: true,
         });
       },
 
       logout: () => {
-        const token = localStorage.getItem('accessToken');
-
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        const token = useAuthStore.getState().accessToken;
+        clearAccessToken();
 
         set({
           user: null,
           accessToken: null,
-          refreshToken: null,
           isAuthenticated: false,
         });
 
@@ -104,10 +99,18 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<AuthState>;
+        const persistedUser = persisted?.user ?? null;
+        return {
+          ...currentState,
+          ...persisted,
+          user: persistedUser,
+          accessToken: null,
+          isAuthenticated: !!persistedUser,
+        };
+      },
     }
   )
 );

@@ -1,31 +1,42 @@
 import User from '../models/User.js';
 import Product from '../models/Product.js';
 import Order from '../models/Order.js';
+import { asNumber, asObjectId, asString, stripOperators } from '../utils/sanitizeInput.js';
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const errorStatus = (error) => error?.statusCode || 500;
 
 // Get all users
 export const getAllUsers = async (req, res) => {
   try {
-    const { page = 1, limit = 20, role, status, search } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 20)));
+    const role = safeQuery.role ? asString(safeQuery.role) : '';
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
+    const search = safeQuery.search ? asString(safeQuery.search) : '';
 
     const query = {};
     if (role) query.role = role;
     if (status) query.status = status;
     if (search) {
+      const safeSearch = escapeRegex(search);
       query.$or = [
-        { fullName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { businessName: { $regex: search, $options: 'i' } }
+        { fullName: { $regex: safeSearch, $options: 'i' } },
+        { email: { $regex: safeSearch, $options: 'i' } },
+        { businessName: { $regex: safeSearch, $options: 'i' } }
       ];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const [users, total] = await Promise.all([
       User.find(query)
         .select('-password -refreshToken')
         .sort('-createdAt')
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(limit),
       User.countDocuments(query)
     ]);
 
@@ -34,15 +45,15 @@ export const getAllUsers = async (req, res) => {
       data: {
         users,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / limit)
         }
       }
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -52,7 +63,7 @@ export const getAllUsers = async (req, res) => {
 // Get user by ID
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
+    const user = await User.findById(asObjectId(req.params.id))
       .select('-password -refreshToken')
       .populate('affiliatedBy', 'fullName email businessName');
 
@@ -68,7 +79,7 @@ export const getUserById = async (req, res) => {
       data: user
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -78,7 +89,8 @@ export const getUserById = async (req, res) => {
 // Update user status
 export const updateUserStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const sanitizedBody = stripOperators({ ...req.body });
+    const status = asString(sanitizedBody.status || '');
 
     if (!['active', 'suspended', 'pending'].includes(status)) {
       return res.status(400).json({
@@ -88,7 +100,7 @@ export const updateUserStatus = async (req, res) => {
     }
 
     const user = await User.findByIdAndUpdate(
-      req.params.id,
+      asObjectId(req.params.id),
       { status },
       { new: true }
     ).select('-password -refreshToken');
@@ -105,7 +117,7 @@ export const updateUserStatus = async (req, res) => {
       data: user
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -115,7 +127,8 @@ export const updateUserStatus = async (req, res) => {
 // Update user role
 export const updateUserRole = async (req, res) => {
   try {
-    const { role } = req.body;
+    const sanitizedBody = stripOperators({ ...req.body });
+    const role = asString(sanitizedBody.role || '');
 
     if (!['admin', 'outlet', 'user'].includes(role)) {
       return res.status(400).json({
@@ -125,7 +138,7 @@ export const updateUserRole = async (req, res) => {
     }
 
     const user = await User.findByIdAndUpdate(
-      req.params.id,
+      asObjectId(req.params.id),
       { role },
       { new: true }
     ).select('-password -refreshToken');
@@ -142,7 +155,7 @@ export const updateUserRole = async (req, res) => {
       data: user
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -172,7 +185,9 @@ export const getPendingVendors = async (req, res) => {
 // Get all vendors
 export const getAllVendors = async (req, res) => {
   try {
-    const { isApproved, isActive } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const isApproved = safeQuery.isApproved !== undefined ? asString(safeQuery.isApproved) : undefined;
+    const isActive = safeQuery.isActive !== undefined ? asString(safeQuery.isActive) : undefined;
     
     const query = { role: 'outlet' };
     
@@ -208,7 +223,7 @@ export const getAllVendors = async (req, res) => {
       data: { vendors: vendorsWithProductCount }
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -218,9 +233,11 @@ export const getAllVendors = async (req, res) => {
 // Update vendor status (active/inactive)
 export const updateVendorStatus = async (req, res) => {
   try {
-    const { isActive } = req.body;
+    const sanitizedBody = stripOperators({ ...req.body });
+    const isActiveRaw = sanitizedBody.isActive;
+    const isActive = typeof isActiveRaw === 'boolean' ? isActiveRaw : asString(isActiveRaw) === 'true';
 
-    const vendor = await User.findById(req.params.id);
+    const vendor = await User.findById(asObjectId(req.params.id));
 
     if (!vendor) {
       return res.status(404).json({
@@ -245,7 +262,7 @@ export const updateVendorStatus = async (req, res) => {
       message: `Vendor ${isActive ? 'activated' : 'deactivated'} successfully`
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -255,7 +272,7 @@ export const updateVendorStatus = async (req, res) => {
 // Approve vendor
 export const approveVendor = async (req, res) => {
   try {
-    const vendor = await User.findById(req.params.id);
+    const vendor = await User.findById(asObjectId(req.params.id));
 
     if (!vendor) {
       return res.status(404).json({
@@ -282,7 +299,7 @@ export const approveVendor = async (req, res) => {
       message: 'Vendor approved successfully'
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -292,9 +309,10 @@ export const approveVendor = async (req, res) => {
 // Reject vendor
 export const rejectVendor = async (req, res) => {
   try {
-    const { reason } = req.body;
+    const sanitizedBody = stripOperators({ ...req.body });
+    const reason = sanitizedBody.reason ? asString(sanitizedBody.reason) : '';
 
-    const vendor = await User.findById(req.params.id);
+    const vendor = await User.findById(asObjectId(req.params.id));
 
     if (!vendor) {
       return res.status(404).json({
@@ -319,7 +337,7 @@ export const rejectVendor = async (req, res) => {
       reason
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });

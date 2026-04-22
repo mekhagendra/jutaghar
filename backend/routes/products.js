@@ -1,7 +1,7 @@
 import express from 'express';
 import { body } from 'express-validator';
 import * as productController from '../controllers/productController.js';
-import { authenticate, requireVendor, optionalAuth } from '../middleware/auth.js';
+import { authenticate, requireAdmin, requireVendor, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -32,6 +32,6 @@ router.delete('/:id', authenticate, requireVendor, productController.deleteProdu
 router.patch('/:id/variants/quantity', authenticate, requireVendor, productController.updateVariantQuantity);
 
 // Admin utility route to recalculate all product stocks
-router.post('/admin/recalculate-stock', authenticate, productController.recalculateAllStock);
+router.post('/admin/recalculate-stock', authenticate, requireAdmin, productController.recalculateAllStock);
 
 export default router;

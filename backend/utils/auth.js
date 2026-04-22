@@ -1,19 +1,20 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 // Generate JWT token
-export const generateToken = (userId, role) => {
+export const generateToken = (userId, role, jti) => {
   return jwt.sign(
-    { id: userId, role },
+    { id: userId, role, jti: jti || crypto.randomUUID() },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE || '30d' }
+    { expiresIn: process.env.JWT_EXPIRE || '15m' }
   );
 };
 
 // Generate refresh token
-export const generateRefreshToken = (userId) => {
+export const generateRefreshToken = (userId, sessionId) => {
   return jwt.sign(
-    { id: userId },
+    { id: userId, sid: sessionId, jti: crypto.randomUUID() },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRE || '90d' }
   );

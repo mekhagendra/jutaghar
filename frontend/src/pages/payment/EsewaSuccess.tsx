@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, Loader2, XCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
+import { getAccessToken } from '@/lib/authToken';
 
 const EsewaSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -24,7 +25,7 @@ const EsewaSuccess: React.FC = () => {
         }
 
         // Include authentication token in the request
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         const response = await api.get(`/api/payment/esewa/verify?data=${data}`, {
           headers: {
             Authorization: `Bearer ${token}`

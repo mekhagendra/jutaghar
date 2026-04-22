@@ -33,6 +33,7 @@ export function getStatusColor(status: string): string {
     processing: 'text-blue-600 bg-blue-100',
     shipped: 'text-purple-600 bg-purple-100',
     delivered: 'text-green-600 bg-green-100',
+    returned: 'text-orange-700 bg-orange-100',
     cancelled: 'text-red-600 bg-red-100',
     paid: 'text-green-600 bg-green-100',
     failed: 'text-red-600 bg-red-100',

@@ -34,7 +34,7 @@ export const authenticateApiClient = async (req, res, next) => {
     }
 
     // Verify secret
-    if (!apiClient.verifySecret(clientSecret)) {
+    if (!(await apiClient.verifySecret(clientSecret))) {
       return res.status(401).json({
         success: false,
         message: 'Invalid API credentials'
@@ -114,7 +114,7 @@ export const authenticate = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(decoded.id).select('-password -refreshToken');
+    const user = await User.findById(decoded.id).select('-password');
     
     if (!user) {
       return res.status(401).json({
@@ -177,7 +177,7 @@ export const optionalAuth = async (req, res, next) => {
       const decoded = verifyToken(token);
 
       if (decoded) {
-        const user = await User.findById(decoded.id).select('-password -refreshToken');
+        const user = await User.findById(decoded.id).select('-password');
         if (user && user.status === 'active') {
           req.user = user;
         }

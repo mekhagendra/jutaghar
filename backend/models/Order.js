@@ -77,7 +77,7 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
+    enum: ['pending', 'processing', 'shipped', 'delivered', 'returned', 'cancelled', 'refunded'],
     default: 'pending'
   },
   paymentStatus: {
@@ -93,9 +93,19 @@ const orderSchema = new mongoose.Schema({
   shippingAddress: shippingAddressSchema,
   notes: String,
   trackingNumber: String,
+  cancelReason: String,
   shippedAt: Date,
   deliveredAt: Date,
-  cancelledAt: Date
+  returnedAt: Date,
+  cancelledAt: Date,
+  gatewayTransactionId: {
+    type: String,
+    default: null
+  },
+  gatewayPidx: {
+    type: String,
+    default: null
+  }
 }, {
   timestamps: true
 });
@@ -118,6 +128,7 @@ orderSchema.index({ user: 1, createdAt: -1 });
 // Note: orderNumber already has unique index from schema definition
 orderSchema.index({ status: 1 });
 orderSchema.index({ 'items.vendor': 1 });
+orderSchema.index({ gatewayTransactionId: 1 }, { unique: true, sparse: true });
 
 const Order = mongoose.model('Order', orderSchema);
 

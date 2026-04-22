@@ -28,6 +28,6 @@ router.post('/khalti/initiate', authenticate, paymentController.initiateKhaltiPa
 
 // Payment verification routes
 router.get('/esewa/verify', authenticate, paymentController.verifyEsewaPayment);
-router.post('/khalti/verify', paymentController.verifyKhaltiPayment);
+router.post('/khalti/verify', authenticate, paymentController.verifyKhaltiPayment);
 
 export default router;

@@ -88,7 +88,7 @@ export interface Product {
 }
 
 // Order types
-export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'returned' | 'cancelled' | 'refunded';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'esewa' | 'khalti' | 'cash_on_delivery';
 
@@ -130,8 +130,10 @@ export interface Order {
   shippingAddress: ShippingAddress;
   notes?: string;
   trackingNumber?: string;
+  cancelReason?: string;
   shippedAt?: string;
   deliveredAt?: string;
+  returnedAt?: string;
   cancelledAt?: string;
   createdAt: string;
   updatedAt: string;

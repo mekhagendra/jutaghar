@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
 
-const STATUS_OPTIONS = ['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+const STATUS_OPTIONS = ['all', 'pending', 'processing', 'shipped', 'delivered', 'returned', 'cancelled'];
+const ACTIVE_VENDOR_STAGES = ['pending', 'processing', 'shipped', 'delivered', 'returned'];
 
 interface VendorOrderItem {
   product: { _id: string; name: string; images?: string[] };
@@ -26,8 +28,10 @@ interface VendorOrder {
 }
 
 const VendorOrders: React.FC = () => {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
+  const [selectedStatus, setSelectedStatus] = useState<Record<string, string>>({});
   const limit = 10;
 
   const { data, isLoading } = useQuery({
@@ -42,6 +46,49 @@ const VendorOrders: React.FC = () => {
 
   const orders = data?.orders ?? [];
   const pagination = data?.pagination;
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, nextStatus, cancelReason }: { orderId: string; nextStatus: string; cancelReason?: string }) => {
+      await api.patch(`/api/orders/${orderId}/status`, {
+        status: nextStatus,
+        cancelReason,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Order status updated');
+      queryClient.invalidateQueries({ queryKey: ['vendor-orders-full'] });
+    },
+    onError: (error: unknown) => {
+      const message = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : 'Failed to update order status';
+      toast.error(message || 'Failed to update order status');
+    },
+  });
+
+  const handleApplyStatus = (order: VendorOrder) => {
+    const nextStatus = selectedStatus[order._id] || order.status;
+    if (nextStatus === order.status) {
+      toast('Order is already at this stage');
+      return;
+    }
+
+    if (!ACTIVE_VENDOR_STAGES.includes(nextStatus)) {
+      toast.error('Invalid stage selected');
+      return;
+    }
+
+    updateStatusMutation.mutate({ orderId: order._id, nextStatus });
+  };
+
+  const handleCancelOrder = (order: VendorOrder) => {
+    const reason = window.prompt(`Cancel order ${order.orderNumber}. Enter cancellation reason:`);
+    if (!reason || !reason.trim()) {
+      toast.error('Cancel reason is required');
+      return;
+    }
+    updateStatusMutation.mutate({ orderId: order._id, nextStatus: 'cancelled', cancelReason: reason.trim() });
+  };
 
   return (
     <div>
@@ -89,7 +136,7 @@ const VendorOrders: React.FC = () => {
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Items</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Total</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600"></th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Manage</th>
                 </tr>
               </thead>
               <tbody>
@@ -115,12 +162,51 @@ const VendorOrders: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 font-medium text-gray-800">{formatCurrency(order.total)}</td>
                     <td className="py-3 px-4">
-                      <Link
-                        to={`/orders/${order._id}`}
-                        className="text-primary-600 hover:text-primary-700 hover:underline text-sm font-medium"
-                      >
-                        View
-                      </Link>
+                      <div className="flex flex-col gap-2 min-w-[200px]">
+                        <Link
+                          to={`/orders/${order._id}`}
+                          className="text-primary-600 hover:text-primary-700 hover:underline text-sm font-medium"
+                        >
+                          View
+                        </Link>
+
+                        {order.status !== 'cancelled' && order.status !== 'refunded' ? (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={selectedStatus[order._id] || order.status}
+                                onChange={(e) => setSelectedStatus((prev) => ({ ...prev, [order._id]: e.target.value }))}
+                                className="px-2 py-1 text-xs rounded border border-gray-300 bg-white"
+                              >
+                                {ACTIVE_VENDOR_STAGES.map((stage) => (
+                                  <option key={stage} value={stage}>
+                                    {stage}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => handleApplyStatus(order)}
+                                disabled={updateStatusMutation.isPending}
+                                className="px-2.5 py-1 text-xs rounded bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
+                              >
+                                Update
+                              </button>
+                            </div>
+
+                            <button
+                              onClick={() => handleCancelOrder(order)}
+                              disabled={updateStatusMutation.isPending}
+                              className="w-fit px-2.5 py-1 text-xs rounded bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 disabled:opacity-50"
+                            >
+                              Cancel (Reason Required)
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            {order.status === 'cancelled' ? 'Cancelled order' : 'No further updates'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

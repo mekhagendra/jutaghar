@@ -17,7 +17,9 @@ const UserProfile: React.FC = () => {
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
+    otp: '',
   });
+  const [passwordOtpRequested, setPasswordOtpRequested] = useState(false);
 
   const profileMutation = useMutation({
     mutationFn: async (data: { fullName: string; phone: string }) => {
@@ -35,15 +37,30 @@ const UserProfile: React.FC = () => {
 
   const passwordMutation = useMutation({
     mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      const response = await api.put('/api/auth/password', data);
+      const response = await api.post('/api/auth/change-password/request-otp', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      setPasswordOtpRequested(true);
+      toast.success('OTP sent to your email. Enter OTP to confirm password change.');
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'Failed to request password change OTP.');
+    },
+  });
+
+  const verifyPasswordMutation = useMutation({
+    mutationFn: async (otp: string) => {
+      const response = await api.post('/api/auth/change-password/verify-otp', { otp });
       return response.data;
     },
     onSuccess: () => {
       toast.success('Password changed successfully');
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setPasswordOtpRequested(false);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '', otp: '' });
     },
-    onError: () => {
-      toast.error('Failed to change password. Check your current password.');
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message || 'OTP verification failed.');
     },
   });
 
@@ -93,6 +110,16 @@ const UserProfile: React.FC = () => {
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (passwordOtpRequested) {
+      if (!passwordForm.otp.trim()) {
+        toast.error('Please enter OTP');
+        return;
+      }
+      verifyPasswordMutation.mutate(passwordForm.otp);
+      return;
+    }
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast.error('New passwords do not match');
       return;
@@ -224,13 +251,27 @@ const UserProfile: React.FC = () => {
               />
             </div>
 
+            {passwordOtpRequested && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">OTP</label>
+                <input
+                  type="text"
+                  value={passwordForm.otp}
+                  onChange={(e) => setPasswordForm((p) => ({ ...p, otp: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter the OTP sent to your email to confirm password change.</p>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={passwordMutation.isPending}
+              disabled={passwordMutation.isPending || verifyPasswordMutation.isPending}
               className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-60"
             >
               <Lock className="w-4 h-4" />
-              {passwordMutation.isPending ? 'Updating...' : 'Update Password'}
+              {passwordMutation.isPending ? 'Sending OTP...' : verifyPasswordMutation.isPending ? 'Verifying...' : passwordOtpRequested ? 'Verify OTP & Update Password' : 'Request OTP for Password Change'}
             </button>
           </form>
         </div>

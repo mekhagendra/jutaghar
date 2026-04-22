@@ -82,7 +82,7 @@ export const createCategory = async (req, res) => {
 
     const categoryData = { ...req.body };
     if (categoryData.image) {
-      categoryData.image = saveBase64Image(categoryData.image, 'categories');
+      categoryData.image = await saveBase64Image(categoryData.image, 'categories');
     }
 
     const category = await Category.create(categoryData);
@@ -109,7 +109,7 @@ export const updateCategory = async (req, res) => {
   try {
     const updateData = { ...req.body };
     if (updateData.image) {
-      updateData.image = saveBase64Image(updateData.image, 'categories');
+      updateData.image = await saveBase64Image(updateData.image, 'categories');
     }
 
     const category = await Category.findByIdAndUpdate(
@@ -224,7 +224,7 @@ export const createBrand = async (req, res) => {
 
     const brandData = { ...req.body };
     if (brandData.logo) {
-      brandData.logo = saveBase64Image(brandData.logo, 'brands');
+      brandData.logo = await saveBase64Image(brandData.logo, 'brands');
     }
 
     const brand = await Brand.create(brandData);
@@ -251,7 +251,7 @@ export const updateBrand = async (req, res) => {
   try {
     const updateData = { ...req.body };
     if (updateData.logo) {
-      updateData.logo = saveBase64Image(updateData.logo, 'brands');
+      updateData.logo = await saveBase64Image(updateData.logo, 'brands');
     }
 
     const brand = await Brand.findByIdAndUpdate(

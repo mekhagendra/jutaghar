@@ -19,6 +19,14 @@ const affiliationSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+const otpStateSchema = new mongoose.Schema({
+  otpHash: String,
+  otpExpiresAt: Date,
+  pendingPassword: String,
+  attempts: { type: Number, default: 0 },
+  lockedUntil: { type: Date }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
@@ -98,8 +106,14 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  
-  refreshToken: String
+  emailVerified: {
+    type: Boolean,
+    default: true
+  },
+  emailVerification: otpStateSchema,
+  passwordReset: otpStateSchema,
+  passwordChange: otpStateSchema,
+
 }, {
   timestamps: true
 });

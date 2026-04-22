@@ -6,9 +6,15 @@ import mongoose from 'mongoose';
 import DeliverySettings from '../models/DeliverySettings.js';
 import { calculateTaxForItems } from '../utils/taxCalculator.js';
 
-// eSewa configuration
-const ESEWA_SECRET_KEY = process.env.ESEWA_SECRET_KEY || '8gBm/:&EnhH.1/q';
-const ESEWA_MERCHANT_CODE = process.env.ESEWA_MERCHANT_CODE || 'EPAYTEST';
+// eSewa configuration — fail fast if secrets are absent
+if (!process.env.ESEWA_SECRET_KEY) {
+  throw new Error('ESEWA_SECRET_KEY environment variable is required but not set');
+}
+if (!process.env.ESEWA_MERCHANT_CODE) {
+  throw new Error('ESEWA_MERCHANT_CODE environment variable is required but not set');
+}
+const ESEWA_SECRET_KEY = process.env.ESEWA_SECRET_KEY;
+const ESEWA_MERCHANT_CODE = process.env.ESEWA_MERCHANT_CODE;
 
 // Initiate order (create pending order before payment)
 export const initiateOrder = async (req, res) => {
@@ -140,16 +146,34 @@ export const initiateOrder = async (req, res) => {
 // Generate eSewa signature
 export const generateEsewaSignature = async (req, res) => {
   try {
-    const { transaction_uuid, total_amount, product_code } = req.body;
+    const { orderId } = req.body;
 
-    if (!transaction_uuid || !total_amount || !product_code) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields'
+        message: 'orderId is required'
       });
     }
 
-    // Generate signature using HMAC-SHA256
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (!order.user.equals(req.user._id)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to order' });
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return res.status(409).json({ success: false, message: 'Order is already paid' });
+    }
+
+    // Use server-authoritative values — never trust client-supplied amounts
+    const total_amount = order.total.toFixed(2);
+    const transaction_uuid = String(order._id);
+    const product_code = ESEWA_MERCHANT_CODE;
+
     const message = `total_amount=${total_amount},transaction_uuid=${transaction_uuid},product_code=${product_code}`;
     const signature = crypto
       .createHmac('sha256', ESEWA_SECRET_KEY)
@@ -160,7 +184,10 @@ export const generateEsewaSignature = async (req, res) => {
       success: true,
       data: {
         signature,
-        signed_field_names: 'total_amount,transaction_uuid,product_code'
+        signed_field_names: 'total_amount,transaction_uuid,product_code',
+        total_amount,
+        transaction_uuid,
+        product_code
       }
     });
   } catch (error) {
@@ -225,6 +252,15 @@ export const verifyEsewaPayment = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized access to order'
+      });
+    }
+
+    // Idempotency guard — already paid, return success without re-decrementing stock
+    if (order.paymentStatus === 'paid') {
+      return res.json({
+        success: true,
+        message: 'Payment already verified',
+        data: { orderId: order._id, orderNumber: order.orderNumber }
       });
     }
 
@@ -328,6 +364,23 @@ export const verifyKhaltiPayment = async (req, res) => {
       });
     }
 
+    // Ownership check — caller must own the order
+    if (!order.user.equals(req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized access to order'
+      });
+    }
+
+    // Idempotency guard — already paid, return success without re-decrementing stock
+    if (order.paymentStatus === 'paid') {
+      return res.json({
+        success: true,
+        message: 'Payment already verified',
+        data: { orderId: order._id, orderNumber: order.orderNumber }
+      });
+    }
+
     // Verify amount (Khalti sends in paisa, convert to rupees)
     const paidAmount = paymentData.total_amount / 100;
     if (paidAmount !== order.total) {
@@ -344,6 +397,8 @@ export const verifyKhaltiPayment = async (req, res) => {
     try {
       order.paymentStatus = 'paid';
       order.status = 'processing';
+      order.gatewayTransactionId = transaction_id || null;
+      order.gatewayPidx = pidx;
       await order.save({ session });
 
       // Update product stock
@@ -389,14 +444,33 @@ export const verifyKhaltiPayment = async (req, res) => {
 // Initiate Khalti payment
 export const initiateKhaltiPayment = async (req, res) => {
   try {
-    const { return_url, website_url, amount, purchase_order_id, purchase_order_name } = req.body;
+    const { orderId, return_url, website_url } = req.body;
 
-    if (!return_url || !amount || !purchase_order_id || !purchase_order_name) {
+    if (!orderId || !return_url || !website_url) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required payment data'
+        message: 'orderId, return_url and website_url are required'
       });
     }
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (!order.user.equals(req.user._id)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to order' });
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return res.status(409).json({ success: false, message: 'Order is already paid' });
+    }
+
+    // Use server-authoritative amount and order reference
+    const amount = Math.round(order.total * 100); // Khalti uses paisa
+    const purchase_order_id = String(order._id);
+    const purchase_order_name = order.orderNumber;
 
     // Initiate payment with Khalti
     const response = await axios.post(

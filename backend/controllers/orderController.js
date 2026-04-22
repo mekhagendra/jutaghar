@@ -5,6 +5,9 @@ import User from '../models/User.js';
 import mongoose from 'mongoose';
 import DeliverySettings from '../models/DeliverySettings.js';
 import { calculateTaxForItems } from '../utils/taxCalculator.js';
+import { asNumber, asObjectId, asString, stripOperators } from '../utils/sanitizeInput.js';
+
+const errorStatus = (error) => error?.statusCode || 500;
 
 // Create order
 export const createOrder = async (req, res) => {
@@ -21,7 +24,12 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    const { items, paymentMethod, shippingAddress, notes } = req.body;
+    const sanitizedBody = stripOperators({ ...req.body });
+    const paymentMethod = sanitizedBody.paymentMethod ? asString(sanitizedBody.paymentMethod) : undefined;
+    const notes = sanitizedBody.notes ? asString(sanitizedBody.notes) : undefined;
+    const shippingAddress = stripOperators({ ...(sanitizedBody.shippingAddress || {}) });
+    const rawItems = Array.isArray(sanitizedBody.items) ? sanitizedBody.items : [];
+    const items = rawItems.map((item) => stripOperators({ ...item }));
 
     // Get user
     const user = await User.findById(req.user._id);
@@ -31,7 +39,7 @@ export const createOrder = async (req, res) => {
     let subtotal = 0;
 
     for (const item of items) {
-      const product = await Product.findById(item.product)
+      const product = await Product.findById(asObjectId(item.product))
         .session(session);
       
       if (!product) {
@@ -54,12 +62,18 @@ export const createOrder = async (req, res) => {
       let availableStock = product.stock;
       let selectedVariant = null;
 
-      if (item.variant) {
+      const quantity = Math.max(1, asNumber(item.quantity, 1));
+
+      if (item.variant && typeof item.variant === 'object') {
+        const variant = stripOperators({ ...item.variant });
+        const variantColor = variant.color ? asString(variant.color) : '';
+        const variantSize = variant.size ? asString(variant.size) : '';
+        const variantSku = variant.sku ? asString(variant.sku) : '';
         // Find the specific variant
         selectedVariant = product.variants.find(v =>
-          (!item.variant.color || v.color === item.variant.color) &&
-          (!item.variant.size || v.size === item.variant.size) &&
-          (!item.variant.sku || v.sku === item.variant.sku)
+          (!variantColor || v.color === variantColor) &&
+          (!variantSize || v.size === variantSize) &&
+          (!variantSku || v.sku === variantSku)
         );
 
         if (!selectedVariant) {
@@ -72,19 +86,19 @@ export const createOrder = async (req, res) => {
 
         availableStock = selectedVariant.quantity;
 
-        if (availableStock < item.quantity) {
+        if (availableStock < quantity) {
           await session.abortTransaction();
           return res.status(400).json({
             success: false,
-            message: `Insufficient stock for ${product.name} (${item.variant.color || ''} ${item.variant.size || ''}). Available: ${availableStock}`
+            message: `Insufficient stock for ${product.name} (${variantColor || ''} ${variantSize || ''}). Available: ${availableStock}`
           });
         }
 
         // Deduct from variant quantity
-        selectedVariant.quantity -= item.quantity;
+        selectedVariant.quantity -= quantity;
       } else {
         // No variant selected - check total product stock
-        if (product.stock < item.quantity) {
+        if (product.stock < quantity) {
           await session.abortTransaction();
           return res.status(400).json({
             success: false,
@@ -96,29 +110,30 @@ export const createOrder = async (req, res) => {
       // Determine price
       let itemPrice = selectedVariant?.price || product.price;
 
-      const itemTotal = itemPrice * item.quantity;
+      const itemTotal = itemPrice * quantity;
       subtotal += itemTotal;
 
       const orderItem = {
         product: product._id,
-        quantity: item.quantity,
+        quantity,
         price: itemPrice,
         vendor: product.vendor._id || product.vendor
       };
 
       // Add variant info if present
-      if (item.variant) {
+      if (item.variant && typeof item.variant === 'object') {
+        const variant = stripOperators({ ...item.variant });
         orderItem.variant = {
-          color: item.variant.color,
-          size: item.variant.size,
-          sku: item.variant.sku
+          color: variant.color ? asString(variant.color) : undefined,
+          size: variant.size ? asString(variant.size) : undefined,
+          sku: variant.sku ? asString(variant.sku) : undefined
         };
       }
 
       orderItems.push(orderItem);
 
       // Update stock - will be recalculated from variants in pre-save hook
-      product.sales += item.quantity;
+      product.sales += quantity;
       await product.save({ session });
     }
 
@@ -145,7 +160,16 @@ export const createOrder = async (req, res) => {
       shippingCost,
       total,
       paymentMethod,
-      shippingAddress,
+      shippingAddress: {
+        fullName: shippingAddress.fullName ? asString(shippingAddress.fullName) : undefined,
+        phone: shippingAddress.phone ? asString(shippingAddress.phone) : undefined,
+        province: shippingAddress.province ? asString(shippingAddress.province) : undefined,
+        city: shippingAddress.city ? asString(shippingAddress.city) : undefined,
+        area: shippingAddress.area ? asString(shippingAddress.area) : undefined,
+        streetAddress: shippingAddress.streetAddress ? asString(shippingAddress.streetAddress) : undefined,
+        landmark: shippingAddress.landmark ? asString(shippingAddress.landmark) : undefined,
+        country: shippingAddress.country ? asString(shippingAddress.country) : undefined,
+      },
       notes
     });
 
@@ -159,7 +183,7 @@ export const createOrder = async (req, res) => {
     });
   } catch (error) {
     await session.abortTransaction();
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -171,19 +195,22 @@ export const createOrder = async (req, res) => {
 // Get user's orders
 export const getUserOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 10)));
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
 
     const query = { user: req.user._id };
     if (status) query.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const [orders, total] = await Promise.all([
       Order.find(query)
         .populate('items.product', 'name images')
         .sort('-createdAt')
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(limit),
       Order.countDocuments(query)
     ]);
 
@@ -192,10 +219,10 @@ export const getUserOrders = async (req, res) => {
       data: {
         orders,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / limit)
         }
       }
     });
@@ -210,7 +237,7 @@ export const getUserOrders = async (req, res) => {
 // Get order by ID
 export const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
+    const order = await Order.findById(asObjectId(req.params.id))
       .populate('items.product', 'name images price')
       .populate('items.vendor', 'businessName fullName');
 
@@ -238,7 +265,7 @@ export const getOrderById = async (req, res) => {
       data: order
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -248,7 +275,7 @@ export const getOrderById = async (req, res) => {
 // Cancel order
 export const cancelOrder = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(asObjectId(req.params.id));
 
     if (!order) {
       return res.status(404).json({
@@ -289,7 +316,7 @@ export const cancelOrder = async (req, res) => {
       data: order
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -299,9 +326,9 @@ export const cancelOrder = async (req, res) => {
 // Public order tracking by order number (no auth required)
 export const trackOrder = async (req, res) => {
   try {
-    const { orderNumber } = req.params;
+    const orderNumber = asString(req.params.orderNumber || '').toUpperCase().trim();
 
-    const order = await Order.findOne({ orderNumber: orderNumber.toUpperCase().trim() })
+    const order = await Order.findOne({ orderNumber })
       .select('orderNumber status paymentStatus paymentMethod createdAt shippedAt deliveredAt cancelledAt trackingNumber items shippingAddress')
       .populate('items.product', 'name images');
 
@@ -331,19 +358,22 @@ export const trackOrder = async (req, res) => {
 
     res.json({ success: true, data: safeOrder });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: error.message });
   }
 };
 
 // Get vendor's orders
 export const getVendorOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 10)));
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
 
     const query = { 'items.vendor': req.user._id };
     if (status) query.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const [orders, total] = await Promise.all([
       Order.find(query)
@@ -351,7 +381,7 @@ export const getVendorOrders = async (req, res) => {
         .populate('items.product', 'name images')
         .sort('-createdAt')
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(limit),
       Order.countDocuments(query)
     ]);
 
@@ -360,10 +390,10 @@ export const getVendorOrders = async (req, res) => {
       data: {
         orders,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / limit)
         }
       }
     });
@@ -378,8 +408,13 @@ export const getVendorOrders = async (req, res) => {
 // Update order status (vendor/admin)
 export const updateOrderStatus = async (req, res) => {
   try {
-    const { status, trackingNumber } = req.body;
-    const order = await Order.findById(req.params.id);
+    const sanitizedBody = stripOperators({ ...req.body });
+    const status = sanitizedBody.status ? asString(sanitizedBody.status) : '';
+    const trackingNumber = sanitizedBody.trackingNumber ? asString(sanitizedBody.trackingNumber) : '';
+    const cancelReason = sanitizedBody.cancelReason ? asString(sanitizedBody.cancelReason) : '';
+    const order = await Order.findById(asObjectId(req.params.id));
+
+    const ACTIVE_VENDOR_STAGES = ['pending', 'processing', 'shipped', 'delivered', 'returned'];
 
     if (!order) {
       return res.status(404).json({
@@ -400,9 +435,72 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     if (status) {
-      order.status = status;
-      if (status === 'shipped') order.shippedAt = new Date();
-      if (status === 'delivered') order.deliveredAt = new Date();
+      if (status === 'cancelled') {
+        if (order.status === 'cancelled') {
+          return res.status(400).json({
+            success: false,
+            message: 'Order is already cancelled'
+          });
+        }
+
+        if (order.status === 'refunded') {
+          return res.status(400).json({
+            success: false,
+            message: 'Refunded orders cannot be cancelled'
+          });
+        }
+
+        if (!String(cancelReason || '').trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cancel reason is required to cancel an order'
+          });
+        }
+
+        order.status = 'cancelled';
+        order.cancelledAt = new Date();
+        order.cancelReason = cancelReason.trim();
+
+        for (const item of order.items) {
+          await Product.findByIdAndUpdate(item.product, {
+            $inc: { stock: item.quantity, sales: -item.quantity }
+          });
+        }
+      } else {
+        if (!ACTIVE_VENDOR_STAGES.includes(status)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid target status for vendor update'
+          });
+        }
+
+        if (['cancelled', 'refunded'].includes(order.status)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cancelled/refunded orders cannot be moved to another stage'
+          });
+        }
+
+        order.status = status;
+        order.cancelledAt = undefined;
+        order.cancelReason = undefined;
+
+        if (status === 'shipped' && !order.shippedAt) order.shippedAt = new Date();
+        if (status === 'delivered' && !order.deliveredAt) order.deliveredAt = new Date();
+        if (status === 'returned' && !order.returnedAt) order.returnedAt = new Date();
+
+        // Keep timeline fields consistent when moving backward.
+        if (status === 'pending' || status === 'processing') {
+          order.shippedAt = undefined;
+          order.deliveredAt = undefined;
+          order.returnedAt = undefined;
+        } else if (status === 'shipped') {
+          order.deliveredAt = undefined;
+          order.returnedAt = undefined;
+        } else if (status === 'delivered') {
+          order.returnedAt = undefined;
+        }
+      }
     }
 
     if (trackingNumber) {
@@ -416,7 +514,7 @@ export const updateOrderStatus = async (req, res) => {
       data: order
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });

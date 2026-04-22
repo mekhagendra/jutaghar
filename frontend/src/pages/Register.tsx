@@ -22,9 +22,13 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
-  const { register: registerUser, googleLogin } = useAuthStore();
+  const { requestSignupOtp, verifySignupOtp, googleLogin } = useAuthStore();
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
 
   const {
     register,
@@ -38,11 +42,55 @@ const Register: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      await registerUser(data);
-      navigate('/');
+      setSuccess('');
+
+      const payload = {
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
+        password: data.password,
+      };
+
+      await requestSignupOtp(payload);
+      setPendingPayload(payload);
+      setPendingEmail(data.email);
+      setSuccess('We sent a verification OTP to your email. Enter it below to activate your account.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       setError(e.response?.data?.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingEmail) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      await verifySignupOtp(pendingEmail, otp);
+      navigate('/');
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { message?: string } } };
+      setError(e2.response?.data?.message || 'OTP verification failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!pendingPayload) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      await requestSignupOtp(pendingPayload);
+      setSuccess('A new OTP has been sent to your email.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message || 'Failed to resend OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -64,6 +112,12 @@ const Register: React.FC = () => {
         {error && (
           <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6 text-sm">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 text-green-700 p-4 rounded-lg mb-6 text-sm">
+            {success}
           </div>
         )}
 
@@ -104,6 +158,7 @@ const Register: React.FC = () => {
         </div>
 
         {/* Registration form */}
+        {!pendingEmail && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
@@ -136,9 +191,39 @@ const Register: React.FC = () => {
           </div>
 
           <button type="submit" disabled={loading} className="w-full btn btn-primary">
-            {loading ? 'Creating Account...' : 'Create Account'}
+            {loading ? 'Sending OTP...' : 'Create Account'}
           </button>
         </form>
+        )}
+
+        {pendingEmail && (
+          <form onSubmit={handleVerifyOtp} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Verification OTP</label>
+              <input
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                className="input"
+                placeholder="Enter 6-digit OTP"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">Sent to {pendingEmail}</p>
+            </div>
+
+            <button type="submit" disabled={loading} className="w-full btn btn-primary">
+              {loading ? 'Verifying...' : 'Verify & Create Account'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={loading}
+              className="w-full btn border border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Resend OTP
+            </button>
+          </form>
+        )}
 
         <p className="mt-4 text-center text-xs text-gray-500">
           Want to sell on Juta Ghar? Register first, then request vendor access from your profile.
