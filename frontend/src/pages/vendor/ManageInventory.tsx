@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Package, Plus, Edit, Trash2, X, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'react-hot-toast';
+import { isImageDataUrl, uploadProductDataUrls } from '@/lib/uploads';
 
 interface ProductVariant {
   _id?: string;
@@ -64,16 +65,22 @@ const ManageInventory: React.FC = () => {
     mutationFn: async ({ productId, variant }: { productId: string; variant: ProductVariant }) => {
       const product = await api.get(`/api/products/${productId}`);
       const existingVariants = product.data.data.variants || [];
+
+      let uploadedVariant = { ...variant };
+      if (isImageDataUrl(uploadedVariant.image)) {
+        const [uploadedVariantImage] = await uploadProductDataUrls([uploadedVariant.image as string]);
+        uploadedVariant = { ...uploadedVariant, image: uploadedVariantImage };
+      }
       
       let updatedVariants;
       if (editingVariant && editingVariant._id) {
         // Update existing variant
         updatedVariants = existingVariants.map((v: ProductVariant) => 
-          v._id === editingVariant._id ? { ...v, ...variant } : v
+          v._id === editingVariant._id ? { ...v, ...uploadedVariant } : v
         );
       } else {
         // Add new variant
-        updatedVariants = [...existingVariants, variant];
+        updatedVariants = [...existingVariants, uploadedVariant];
       }
 
       const response = await api.put(`/api/products/${productId}`, {

@@ -1,5 +1,4 @@
 import HeroSlide from '../models/HeroSlide.js';
-import { saveBase64Image } from '../utils/imageStorage.js';
 
 // Public: Get all active hero slides
 export const getHeroSlides = async (req, res) => {
@@ -33,13 +32,11 @@ export const createHeroSlide = async (req, res) => {
       });
     }
 
-    const savedImage = saveBase64Image(image, 'hero');
-
     const slide = await HeroSlide.create({
       collectionName,
       title,
       shopNowUrl,
-      image: savedImage,
+      image,
       order: order ?? 0,
       isActive: isActive !== undefined ? isActive : true,
     });
@@ -58,7 +55,7 @@ export const updateHeroSlide = async (req, res) => {
 
     const updateData = { collectionName, title, shopNowUrl, order, isActive };
     if (image) {
-      updateData.image = saveBase64Image(image, 'hero');
+      updateData.image = image;
     }
 
     const slide = await HeroSlide.findByIdAndUpdate(

@@ -3,35 +3,62 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { stripDollarKeys } from './middleware/stripDollarKeys.js';
 
-// Load environment variables FIRST so UPLOAD_DIR is available everywhere
-dotenv.config();
+// Load environment variables first so Cloudinary config is available everywhere.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-/**
- * JutaGhar E-commerce API Server
- * 
- * FILE UPLOAD STRATEGY:
- * - Physical files saved to UPLOAD_DIR (file system)
- * - Only metadata (paths, sizes, types) stored in MongoDB
- * - Files served via /uploads/* static endpoint
- */
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '.env.local'), override: true });
 
-// File upload configuration
-// Files are saved to UPLOAD_DIR, only metadata stored in database
-const uploadDir = process.env.UPLOAD_DIR || './uploads';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-  console.log(`✅ Created upload directory: ${uploadDir}`);
-} else {
-  console.log(`✅ Upload directory ready: ${uploadDir}`);
-}
+// ── Fail-fast env validation ──────────────────────────────────────────────────
+const assertRequiredEnv = () => {
+  const missing = [];
 
-// Export uploadDir for use in routes
-export { uploadDir };
+  const required = [
+    'MONGODB_URI',
+    'JWT_SECRET',
+    'ESEWA_SECRET_KEY',
+    'ESEWA_MERCHANT_CODE',
+    'KHALTI_SECRET_KEY',
+    'KHALTI_GATEWAY_URL',
+    'SMTP_USER',
+    'SMTP_PASSWORD',
+    'GOOGLE_CLIENT_ID',
+  ];
+
+  for (const key of required) {
+    if (!process.env[key]) missing.push(key);
+  }
+
+  // Cloudinary: accept either the combined URL or all three discrete vars
+  const hasCloudinaryUrl = !!process.env.CLOUDINARY_URL;
+  const hasCloudinaryParts =
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET;
+
+  if (!hasCloudinaryUrl && !hasCloudinaryParts) {
+    missing.push('CLOUDINARY_URL (or CLOUDINARY_CLOUD_NAME + CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET)');
+  }
+
+  if (missing.length > 0) {
+    console.error('');
+    console.error('ERROR: The following required environment variables are not set:');
+    for (const key of missing) console.error(`  - ${key}`);
+    console.error('');
+    console.error('Copy .env.example to .env and fill in the missing values.');
+    process.exit(1);
+  }
+};
+
+assertRequiredEnv();
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -46,19 +73,18 @@ import paymentRoutes from './routes/payment.js';
 import heroSlidesRoutes from './routes/heroSlides.js';
 import reviewRoutes from './routes/reviews.js';
 import deliverySettingsRoutes from './routes/deliverySettings.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import uploadsRoutes from './routes/uploads.js';
 import { apiVersionMiddleware, restfulCorsMiddleware } from './utils/restful.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Create Express app
 const app = express();
 
+// Trust the first proxy hop so req.ip reflects the real client IP.
+// Must be set before any rate limiter is registered.
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
-app.use(mongoSanitize());
 
 // Rate limiting - more lenient in development
 const limiter = rateLimit({
@@ -76,12 +102,19 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // CORS
+const defaultCorsOrigins = ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'];
+const allowedOrigins = new Set(
+  (process.env.CORS_ORIGINS || defaultCorsOrigins.join(','))
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+
 const corsOptions = {
   origin: function(origin, callback) {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
-    const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'];
-    if (allowedOrigins.includes(origin) || origin.includes('10.0.2.2') || origin.includes('localhost')) {
+    if (allowedOrigins.has(origin)) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
@@ -90,20 +123,26 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Body parser with increased limit for image uploads
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use((err, _req, res, next) => {
+  if (err?.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      success: false,
+      message: 'Origin is not allowed by CORS policy',
+    });
+  }
+  return next(err);
+});
+
+// Orders can contain larger item payloads than the default parser cap.
+app.use('/api/orders', express.json({ limit: '2mb' }), stripDollarKeys);
+
+// Default body-size cap for all other JSON/urlencoded endpoints.
+app.use(express.json({ limit: '256kb' }));
+app.use(stripDollarKeys);
+app.use(express.urlencoded({ extended: true, limit: '256kb' }));
 
 // Compression
 app.use(compression());
-
-// Serve uploaded files as static content
-// Files are physically stored in uploadDir, database only stores file paths
-app.use('/uploads', express.static(uploadDir, {
-  maxAge: '1d', // Cache for 1 day
-  etag: true
-}));
-console.log(`✅ Static file serving enabled: /uploads -> ${uploadDir}`);
 
 // RESTful middleware
 app.use(apiVersionMiddleware);
@@ -147,8 +186,6 @@ const connectWithRetry = async (maxRetries = 10, delay = 3000) => {
 };
 
 // Routes
-// NOTE: File uploads should save physical files to uploadDir
-// and store only file metadata (path, size, type) in database
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
@@ -161,6 +198,7 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/hero-slides', heroSlidesRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/delivery-settings', deliverySettingsRoutes);
+app.use('/api/uploads', uploadsRoutes);
 
 // API Documentation endpoint
 app.get('/api/docs', (req, res) => {

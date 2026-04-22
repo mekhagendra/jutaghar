@@ -1,60 +1,123 @@
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import { v2 as cloudinary } from 'cloudinary';
 
-/**
- * Get the upload directory from environment.
- * Called at runtime (after dotenv.config()) so it always reads the correct value.
- */
-function getUploadDir() {
-  return process.env.UPLOAD_DIR || './uploads';
+let isConfigured = false;
+
+function parseCloudinaryUrl(cloudinaryUrl) {
+  try {
+    const parsed = new URL(cloudinaryUrl);
+
+    if (parsed.protocol !== 'cloudinary:') {
+      return null;
+    }
+
+    return {
+      cloud_name: parsed.hostname,
+      api_key: decodeURIComponent(parsed.username),
+      api_secret: decodeURIComponent(parsed.password)
+    };
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Save a base64 data-URL image to the upload directory.
- * Returns the public URL path (e.g. /uploads/products/uuid.jpg).
- * If the input is not a base64 data-URL, returns it unchanged.
- */
-export function saveBase64Image(base64Data, subDir = 'products') {
-  if (!base64Data || typeof base64Data !== 'string' || !base64Data.startsWith('data:image/')) {
-    return base64Data; // already a file path or URL
+function ensureCloudinaryConfigured() {
+  if (isConfigured) {
+    return;
   }
 
-  const match = base64Data.match(/^data:image\/(\w+);base64,(.+)$/);
-  if (!match) return base64Data;
+  const { CLOUDINARY_URL, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
 
-  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
-  const buffer = Buffer.from(match[2], 'base64');
-  const fileName = `${crypto.randomUUID()}.${ext}`;
-  const uploadDir = getUploadDir();
-  const dir = path.join(uploadDir, subDir);
+  if (CLOUDINARY_URL) {
+    const configFromUrl = parseCloudinaryUrl(CLOUDINARY_URL);
 
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    if (!configFromUrl?.cloud_name || !configFromUrl?.api_key || !configFromUrl?.api_secret) {
+      throw new Error('Invalid CLOUDINARY_URL. Expected format: cloudinary://<api_key>:<api_secret>@<cloud_name>');
+    }
+
+    cloudinary.config({
+      ...configFromUrl,
+      secure: true
+    });
+    isConfigured = true;
+    return;
   }
 
-  fs.writeFileSync(path.join(dir, fileName), buffer);
-  return `/uploads/${subDir}/${fileName}`;
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+    throw new Error('Cloudinary is not configured. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.');
+  }
+
+  cloudinary.config({
+    cloud_name: CLOUDINARY_CLOUD_NAME,
+    api_key: CLOUDINARY_API_KEY,
+    api_secret: CLOUDINARY_API_SECRET,
+    secure: true
+  });
+  isConfigured = true;
 }
 
-/**
- * Process product data — converts any base64 images
- * (mainImage, images[], variants[].image) to file paths.
- */
-export function processProductImages(data) {
+function getFolder(subDir) {
+  const baseFolder = process.env.CLOUDINARY_FOLDER || 'jutaghar';
+  return `${baseFolder}/${subDir}`;
+}
+
+export async function saveBase64Image(imageData, subDir = 'products') {
+  if (!imageData || typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
+    return imageData;
+  }
+
+  ensureCloudinaryConfigured();
+
+  const result = await cloudinary.uploader.upload(imageData, {
+    folder: getFolder(subDir),
+    resource_type: 'image'
+  });
+
+  return result.secure_url;
+}
+
+export async function uploadImageBuffer(buffer, subDir = 'products') {
+  if (!buffer || !Buffer.isBuffer(buffer)) {
+    throw new Error('Image buffer is required');
+  }
+
+  ensureCloudinaryConfigured();
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: getFolder(subDir),
+        resource_type: 'image'
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(result.secure_url);
+      }
+    );
+
+    stream.end(buffer);
+  });
+}
+
+export async function processProductImages(data) {
   if (data.mainImage) {
-    data.mainImage = saveBase64Image(data.mainImage, 'products');
+    data.mainImage = await saveBase64Image(data.mainImage, 'products');
   }
   if (data.images && Array.isArray(data.images)) {
-    data.images = data.images.map(img => saveBase64Image(img, 'products'));
+    data.images = await Promise.all(data.images.map((image) => saveBase64Image(image, 'products')));
   }
   if (data.variants && Array.isArray(data.variants)) {
-    data.variants = data.variants.map(v => {
-      if (v.image) {
-        v.image = saveBase64Image(v.image, 'products');
+    data.variants = await Promise.all(data.variants.map(async (variant) => {
+      if (variant.image) {
+        return {
+          ...variant,
+          image: await saveBase64Image(variant.image, 'products')
+        };
       }
-      return v;
-    });
+      return variant;
+    }));
   }
   return data;
 }

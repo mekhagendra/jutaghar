@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit2, Trash2, X, GripVertical } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/api';
+import { isImageDataUrl, uploadHeroDataUrl } from '@/lib/uploads';
 
 interface HeroSlide {
   _id: string;
@@ -49,10 +50,15 @@ export default function ManageHeroSlides() {
 
   const saveMutation = useMutation({
     mutationFn: async (data: HeroSlideFormData) => {
-      if (editingSlide) {
-        return api.put(`/api/hero-slides/${editingSlide._id}`, data);
+      const payload = { ...data };
+      if (isImageDataUrl(payload.image)) {
+        payload.image = await uploadHeroDataUrl(payload.image);
       }
-      return api.post('/api/hero-slides', data);
+
+      if (editingSlide) {
+        return api.put(`/api/hero-slides/${editingSlide._id}`, payload);
+      }
+      return api.post('/api/hero-slides', payload);
     },
     onSuccess: () => {
       toast.success(editingSlide ? 'Hero slide updated!' : 'Hero slide created!');

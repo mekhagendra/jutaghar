@@ -1,22 +1,32 @@
 import { validationResult } from 'express-validator';
+import mongoose from 'mongoose';
+import Brand from '../models/Brand.js';
+import Category from '../models/Category.js';
 import Product from '../models/Product.js';
-import { processProductImages } from '../utils/imageStorage.js';
+import { asNumber, asObjectId, asString, stripOperators } from '../utils/sanitizeInput.js';
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const errorStatus = (error) => error?.statusCode || 500;
 
 // Get all products with filters
 export const getProducts = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 20, 
-      category, 
-      vendor,
-      gender,
-      minPrice,
-      maxPrice,
-      search,
-      sort,
-      status
-    } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 20)));
+    const category = safeQuery.category ? asString(safeQuery.category) : '';
+    const vendor = safeQuery.vendor ? asString(safeQuery.vendor) : '';
+    const gender = safeQuery.gender ? asString(safeQuery.gender) : '';
+    const minPrice = safeQuery.minPrice ? asNumber(safeQuery.minPrice, null) : null;
+    const maxPrice = safeQuery.maxPrice ? asNumber(safeQuery.maxPrice, null) : null;
+    const search = safeQuery.search ? asString(safeQuery.search) : '';
+    const sort = safeQuery.sort ? asString(safeQuery.sort) : '';
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
+    const brand = safeQuery.brand ? asString(safeQuery.brand) : '';
+    const color = safeQuery.color ? asString(safeQuery.color) : '';
+    const size = safeQuery.size ? asString(safeQuery.size) : '';
+    const onSale = safeQuery.onSale ? asString(safeQuery.onSale) : '';
 
     // Map sort values to MongoDB fields
     let sortField = '-createdAt'; // default
@@ -30,7 +40,7 @@ export const getProducts = async (req, res) => {
         'name': 'name',
         '-name': '-name'
       };
-      sortField = sortMap[sort] || sort;
+      sortField = sortMap[sort] || '-createdAt';
     }
 
     const query = {};
@@ -45,46 +55,64 @@ export const getProducts = async (req, res) => {
     // Apply filters
     if (category) {
       const categories = category.split(',').map(c => c.trim());
-      query.category = categories.length > 1 ? { $in: categories } : categories[0];
+      // Resolve names to ObjectIds if needed
+      const resolvedCats = await Promise.all(categories.map(async (c) => {
+        if (mongoose.Types.ObjectId.isValid(c)) return c;
+        const found = await Category.findOne({ name: new RegExp(`^${escapeRegex(c)}$`, 'i') });
+        return found ? found._id : null;
+      }));
+      const validCats = resolvedCats.filter(Boolean);
+      if (validCats.length > 0) {
+        query.category = validCats.length > 1 ? { $in: validCats } : validCats[0];
+      }
     }
-    if (req.query.brand) {
-      const brands = req.query.brand.split(',').map(b => b.trim());
-      query.brand = brands.length > 1 ? { $in: brands } : brands[0];
+    if (brand) {
+      const brands = brand.split(',').map(b => b.trim());
+      // Resolve names to ObjectIds if needed
+      const resolvedBrands = await Promise.all(brands.map(async (b) => {
+        if (mongoose.Types.ObjectId.isValid(b)) return b;
+        const found = await Brand.findOne({ name: new RegExp(`^${escapeRegex(b)}$`, 'i') });
+        return found ? found._id : null;
+      }));
+      const validBrands = resolvedBrands.filter(Boolean);
+      if (validBrands.length > 0) {
+        query.brand = validBrands.length > 1 ? { $in: validBrands } : validBrands[0];
+      }
     }
-    if (vendor) query.vendor = vendor;
+    if (vendor) query.vendor = asObjectId(vendor);
     if (gender) {
       const genders = gender.split(',').map(g => g.trim());
       query.gender = genders.length > 1 ? { $in: genders } : genders[0];
     }
-    if (minPrice || maxPrice) {
+    if (minPrice !== null || maxPrice !== null) {
       query.price = {};
-      if (minPrice) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      if (minPrice !== null) query.price.$gte = minPrice;
+      if (maxPrice !== null) query.price.$lte = maxPrice;
     }
     if (search) {
       query.$text = { $search: search };
     }
 
     // Filter by variant color
-    if (req.query.color) {
-      const colors = req.query.color.split(',').map(c => c.trim());
+    if (color) {
+      const colors = color.split(',').map(c => c.trim());
       query['variants.color'] = colors.length > 1
-        ? { $in: colors.map(c => new RegExp(`^${c}$`, 'i')) }
-        : new RegExp(`^${colors[0]}$`, 'i');
+        ? { $in: colors.map(c => new RegExp(`^${escapeRegex(c)}$`, 'i')) }
+        : new RegExp(`^${escapeRegex(colors[0])}$`, 'i');
     }
 
     // Filter by onSale
-    if (req.query.onSale === 'true') {
+    if (onSale === 'true') {
       query.onSale = true;
     }
 
     // Filter by variant size
-    if (req.query.size) {
-      const sizes = req.query.size.split(',').map(s => s.trim());
+    if (size) {
+      const sizes = size.split(',').map(s => s.trim());
       query['variants.size'] = sizes.length > 1 ? { $in: sizes } : sizes[0];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const [products, total] = await Promise.all([
       Product.find(query)
@@ -93,7 +121,7 @@ export const getProducts = async (req, res) => {
         .populate('brand', 'name')
         .sort(sortField)
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(limit),
       Product.countDocuments(query)
     ]);
 
@@ -102,15 +130,15 @@ export const getProducts = async (req, res) => {
       data: {
         products,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / limit)
         }
       }
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
@@ -159,13 +187,11 @@ export const createProduct = async (req, res) => {
       });
     }
 
+    const sanitizedBody = stripOperators({ ...req.body });
     const productData = {
-      ...req.body,
+      ...sanitizedBody,
       vendor: req.user._id
     };
-
-    // Save base64 images to upload directory
-    processProductImages(productData);
 
     // Set status to active by default for vendors
     if (!productData.status) {
@@ -207,10 +233,8 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    // Save base64 images to upload directory
-    processProductImages(req.body);
-
-    Object.assign(product, req.body);
+    const sanitizedBody = stripOperators({ ...req.body });
+    Object.assign(product, sanitizedBody);
     await product.save();
 
     res.json({
@@ -263,12 +287,15 @@ export const deleteProduct = async (req, res) => {
 // Get vendor's products
 export const getVendorProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 20)));
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
 
     const query = { vendor: req.user._id };
     if (status) query.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const [products, total] = await Promise.all([
       Product.find(query)
@@ -276,7 +303,7 @@ export const getVendorProducts = async (req, res) => {
         .populate('brand', 'name')
         .sort('-createdAt')
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(limit),
       Product.countDocuments(query)
     ]);
 
@@ -285,10 +312,10 @@ export const getVendorProducts = async (req, res) => {
       data: {
         products,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / limit)
         }
       }
     });
@@ -303,7 +330,9 @@ export const getVendorProducts = async (req, res) => {
 // Update variant quantity and recalculate total stock
 export const updateVariantQuantity = async (req, res) => {
   try {
-    const { variantId, quantity } = req.body;
+    const sanitizedBody = stripOperators({ ...req.body });
+    const variantId = asString(sanitizedBody.variantId || '');
+    const quantity = Math.max(0, asNumber(sanitizedBody.quantity, 0));
     
     const product = await Product.findById(req.params.id);
 
@@ -343,7 +372,7 @@ export const updateVariantQuantity = async (req, res) => {
       message: 'Variant quantity updated and total stock recalculated'
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(errorStatus(error)).json({
       success: false,
       message: error.message
     });
