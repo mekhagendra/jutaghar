@@ -26,6 +26,14 @@ const ESEWA_TERMINAL_FAILED = new Set(['CANCELED', 'CANCELLED', 'FAILED', 'NOT_F
 
 const normalizeGatewayStatus = (value) => String(value || '').trim();
 
+class StockConflictError extends Error {
+  constructor(productName) {
+    super(`Insufficient stock for ${productName}`);
+    this.name = 'StockConflictError';
+    this.statusCode = 409;
+  }
+}
+
 const toCurrencyString = (amount) => Number(amount || 0).toFixed(2);
 
 const safeStringEquals = (a, b) => {
@@ -106,18 +114,39 @@ export const settleOrderFromGatewayResult = async ({
           throw new Error('Product not found while settling paid order');
         }
 
-        if (item.variant) {
-          const variant = product.variants.find(
-            (v) => v.color === item.variant.color && v.size === item.variant.size
+        let updatedProduct = null;
+
+        if (item.variant && typeof item.variant === 'object') {
+          const variantMatch = { quantity: { $gte: item.quantity } };
+          if (item.variant.color) variantMatch.color = item.variant.color;
+          if (item.variant.size) variantMatch.size = item.variant.size;
+          if (item.variant.sku) variantMatch.sku = item.variant.sku;
+
+          updatedProduct = await Product.findOneAndUpdate(
+            {
+              _id: item.product,
+              variants: { $elemMatch: variantMatch }
+            },
+            {
+              $inc: {
+                'variants.$.quantity': -item.quantity,
+                stock: -item.quantity,
+                sales: item.quantity
+              }
+            },
+            { session, new: true }
           );
-          if (variant) {
-            variant.quantity -= item.quantity;
-          }
+        } else {
+          updatedProduct = await Product.findOneAndUpdate(
+            { _id: item.product, stock: { $gte: item.quantity } },
+            { $inc: { stock: -item.quantity, sales: item.quantity } },
+            { session, new: true }
+          );
         }
 
-        product.stock -= item.quantity;
-        product.sales += item.quantity;
-        await product.save({ session });
+        if (!updatedProduct) {
+          throw new StockConflictError(product.name || 'product');
+        }
       }
 
       await session.commitTransaction();
@@ -444,6 +473,13 @@ export const verifyEsewaPayment = async (req, res) => {
       data: { orderId: order._id, orderNumber: order.orderNumber }
     });
   } catch (error) {
+    if (error?.statusCode === 409) {
+      return res.status(409).json({
+        success: false,
+        message: error.message
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Internal error', requestId: req.id
@@ -522,6 +558,13 @@ export const verifyKhaltiPayment = async (req, res) => {
       data: { orderId: order._id, orderNumber: order.orderNumber }
     });
   } catch (error) {
+    if (error?.statusCode === 409) {
+      return res.status(409).json({
+        success: false,
+        message: error.message
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Internal error', requestId: req.id

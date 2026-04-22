@@ -59,8 +59,8 @@ export const createOrder = async (req, res) => {
       }
 
       // Handle variant-based inventory
-      let availableStock = product.stock;
       let selectedVariant = null;
+      let stockUpdated = null;
 
       const quantity = Math.max(1, asNumber(item.quantity, 1));
 
@@ -84,27 +84,39 @@ export const createOrder = async (req, res) => {
           });
         }
 
-        availableStock = selectedVariant.quantity;
+        const variantMatch = { quantity: { $gte: quantity } };
+        if (variantColor) variantMatch.color = variantColor;
+        if (variantSize) variantMatch.size = variantSize;
+        if (variantSku) variantMatch.sku = variantSku;
 
-        if (availableStock < quantity) {
-          await session.abortTransaction();
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient stock for ${product.name} (${variantColor || ''} ${variantSize || ''}). Available: ${availableStock}`
-          });
-        }
-
-        // Deduct from variant quantity
-        selectedVariant.quantity -= quantity;
+        stockUpdated = await Product.findOneAndUpdate(
+          {
+            _id: product._id,
+            variants: { $elemMatch: variantMatch }
+          },
+          {
+            $inc: {
+              'variants.$.quantity': -quantity,
+              stock: -quantity,
+              sales: quantity
+            }
+          },
+          { session, new: true }
+        );
       } else {
-        // No variant selected - check total product stock
-        if (product.stock < quantity) {
-          await session.abortTransaction();
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient stock for ${product.name}`
-          });
-        }
+        stockUpdated = await Product.findOneAndUpdate(
+          { _id: product._id, stock: { $gte: quantity } },
+          { $inc: { stock: -quantity, sales: quantity } },
+          { session, new: true }
+        );
+      }
+
+      if (!stockUpdated) {
+        await session.abortTransaction();
+        return res.status(409).json({
+          success: false,
+          message: `Insufficient stock for ${product.name}`
+        });
       }
 
       // Determine price
@@ -131,10 +143,6 @@ export const createOrder = async (req, res) => {
       }
 
       orderItems.push(orderItem);
-
-      // Update stock - will be recalculated from variants in pre-save hook
-      product.sales += quantity;
-      await product.save({ session });
     }
 
     // Calculate totals using vendor-dynamic tax settings

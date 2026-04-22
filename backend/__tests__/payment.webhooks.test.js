@@ -62,16 +62,10 @@ describe('Payment webhooks', () => {
   });
 
   it('settles khalti webhook and remains idempotent on repeated callback', async () => {
-    const mockProduct = {
-      _id: productId,
-      stock: 10,
-      sales: 0,
-      variants: [],
-      save: jest.fn().mockResolvedValue(undefined),
-    };
     Product.findById = jest.fn().mockReturnValue({
-      session: jest.fn().mockResolvedValue(mockProduct),
+      session: jest.fn().mockResolvedValue({ _id: productId, name: 'Webhook Shoe', variants: [] }),
     });
+    Product.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: productId, stock: 8, sales: 2 });
 
     const pendingOrder = {
       _id: orderId,
@@ -93,7 +87,7 @@ describe('Payment webhooks', () => {
 
     expect(first.status).toBe(200);
     expect(pendingOrder.paymentStatus).toBe('paid');
-    expect(mockProduct.save).toHaveBeenCalledTimes(1);
+    expect(Product.findOneAndUpdate).toHaveBeenCalledTimes(1);
 
     // Repeat callback after order has already moved to paid state.
     const second = await request(app)
@@ -103,20 +97,14 @@ describe('Payment webhooks', () => {
 
     expect(second.status).toBe(200);
     expect(second.body.message).toMatch(/already/i);
-    expect(mockProduct.save).toHaveBeenCalledTimes(1);
+    expect(Product.findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 
   it('settles esewa webhook when signature is valid', async () => {
-    const mockProduct = {
-      _id: productId,
-      stock: 5,
-      sales: 0,
-      variants: [],
-      save: jest.fn().mockResolvedValue(undefined),
-    };
     Product.findById = jest.fn().mockReturnValue({
-      session: jest.fn().mockResolvedValue(mockProduct),
+      session: jest.fn().mockResolvedValue({ _id: productId, name: 'Webhook Shoe', variants: [] }),
     });
+    Product.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: productId, stock: 4, sales: 1 });
 
     const pendingOrder = {
       _id: orderId,
@@ -150,6 +138,6 @@ describe('Payment webhooks', () => {
 
     expect(res.status).toBe(200);
     expect(pendingOrder.paymentStatus).toBe('paid');
-    expect(mockProduct.save).toHaveBeenCalledTimes(1);
+    expect(Product.findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 });

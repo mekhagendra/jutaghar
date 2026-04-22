@@ -120,16 +120,10 @@ describe('POST /api/payment/khalti/verify', () => {
 
   // ── Case 3: Idempotency — same pidx twice ──────────────────────────────────
   it('returns 200 on both calls and decrements stock only once', async () => {
-    const mockProduct = {
-      _id: productId,
-      stock: 10,
-      sales: 0,
-      variants: [],
-      save: jest.fn().mockResolvedValue(undefined),
-    };
     Product.findById = jest.fn().mockReturnValue({
-      session: jest.fn().mockResolvedValue(mockProduct),
+      session: jest.fn().mockResolvedValue({ _id: productId, name: 'Test Shoe', variants: [] }),
     });
+    Product.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: productId, stock: 8, sales: 2 });
 
     // ── First call: order is still pending ────────────────────────────────
     const pendingOrder = {
@@ -149,10 +143,10 @@ describe('POST /api/payment/khalti/verify', () => {
 
     expect(firstRes.status).toBe(200);
     // Stock must have been decremented exactly once
-    expect(mockProduct.save).toHaveBeenCalledTimes(1);
+    expect(Product.findOneAndUpdate).toHaveBeenCalledTimes(1);
 
     // Reset counters for the second call
-    mockProduct.save.mockClear();
+    Product.findOneAndUpdate.mockClear();
     mongoose.startSession.mockClear();
 
     // ── Second call: order is now paid (idempotency guard) ────────────────
@@ -173,7 +167,7 @@ describe('POST /api/payment/khalti/verify', () => {
 
     expect(secondRes.status).toBe(200);
     // Stock must NOT have been touched again
-    expect(mockProduct.save).not.toHaveBeenCalled();
+    expect(Product.findOneAndUpdate).not.toHaveBeenCalled();
     // mongoose.startSession must not have been called for the idempotent path
     expect(mongoose.startSession).not.toHaveBeenCalled();
   });
