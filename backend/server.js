@@ -104,7 +104,29 @@ app.use(pinoHttp({
 }));
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com'],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: [
+        "'self'",
+        'https://a.khalti.com',
+        'https://khalti.com',
+        'https://rc-epay.esewa.com.np',
+        'https://esewa.com.np'
+      ],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+    }
+  },
+  crossOriginResourcePolicy: { policy: 'same-site' },
+  hsts: { maxAge: 15552000, includeSubDomains: true, preload: true },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+}));
 
 // Rate limiting - more lenient in development
 const limiter = rateLimit({
