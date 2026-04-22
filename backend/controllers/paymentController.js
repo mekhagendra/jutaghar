@@ -13,8 +13,167 @@ if (!process.env.ESEWA_SECRET_KEY) {
 if (!process.env.ESEWA_MERCHANT_CODE) {
   throw new Error('ESEWA_MERCHANT_CODE environment variable is required but not set');
 }
-const ESEWA_SECRET_KEY = process.env.ESEWA_SECRET_KEY;
-const ESEWA_MERCHANT_CODE = process.env.ESEWA_MERCHANT_CODE;
+const getEsewaSecretKey = () => process.env.ESEWA_SECRET_KEY;
+const getEsewaMerchantCode = () => process.env.ESEWA_MERCHANT_CODE;
+const getKhaltiWebhookSecret = () => process.env.KHALTI_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET || '';
+const ESEWA_STATUS_CHECK_URL = process.env.ESEWA_STATUS_CHECK_URL || 'https://rc.esewa.com.np/api/epay/transaction/status/';
+
+const KHALTI_TERMINAL_SUCCESS = new Set(['Completed']);
+const KHALTI_TERMINAL_FAILED = new Set(['Expired', 'User canceled', 'Cancelled', 'Failed']);
+const ESEWA_TERMINAL_SUCCESS = new Set(['COMPLETE']);
+const ESEWA_TERMINAL_FAILED = new Set(['CANCELED', 'CANCELLED', 'FAILED', 'NOT_FOUND', 'EXPIRED', 'FULL_REFUND', 'REFUNDED']);
+
+const normalizeGatewayStatus = (value) => String(value || '').trim();
+
+const toCurrencyString = (amount) => Number(amount || 0).toFixed(2);
+
+const safeStringEquals = (a, b) => {
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+};
+
+const getEsewaSignedMessage = (payload, signedFieldNames) => {
+  const fields = String(signedFieldNames || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+  return fields
+    .map((field) => `${field}=${payload?.[field] ?? ''}`)
+    .join(',');
+};
+
+export const isOrderAlreadyPaid = (order) => order?.paymentStatus === 'paid';
+
+export const lookupKhaltiTransaction = async (pidx) => {
+  const response = await axios.post(
+    `${process.env.KHALTI_GATEWAY_URL}/epayment/lookup/`,
+    { pidx },
+    {
+      headers: {
+        Authorization: `Key ${process.env.KHALTI_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+  return response.data;
+};
+
+export const lookupEsewaTransaction = async ({ transaction_uuid, total_amount }) => {
+  const response = await axios.get(ESEWA_STATUS_CHECK_URL, {
+    params: {
+      product_code: getEsewaMerchantCode(),
+      total_amount: toCurrencyString(total_amount),
+      transaction_uuid,
+    },
+  });
+  return response.data;
+};
+
+export const settleOrderFromGatewayResult = async ({
+  order,
+  isPaid,
+  failureCode,
+  gatewayTransactionId,
+  gatewayPidx,
+}) => {
+  if (isOrderAlreadyPaid(order)) {
+    return {
+      idempotent: true,
+      paymentStatus: order.paymentStatus,
+      orderStatus: order.status,
+      changed: false,
+    };
+  }
+
+  if (isPaid) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      order.paymentStatus = 'paid';
+      order.status = 'processing';
+      if (gatewayTransactionId) order.gatewayTransactionId = gatewayTransactionId;
+      if (gatewayPidx) order.gatewayPidx = gatewayPidx;
+      await order.save({ session });
+
+      for (const item of order.items) {
+        const product = await Product.findById(item.product).session(session);
+        if (!product) {
+          throw new Error('Product not found while settling paid order');
+        }
+
+        if (item.variant) {
+          const variant = product.variants.find(
+            (v) => v.color === item.variant.color && v.size === item.variant.size
+          );
+          if (variant) {
+            variant.quantity -= item.quantity;
+          }
+        }
+
+        product.stock -= item.quantity;
+        product.sales += item.quantity;
+        await product.save({ session });
+      }
+
+      await session.commitTransaction();
+
+      return {
+        idempotent: false,
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.status,
+        changed: true,
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  if (order.paymentStatus === 'failed' || order.status === 'cancelled') {
+    return {
+      idempotent: true,
+      paymentStatus: order.paymentStatus,
+      orderStatus: order.status,
+      changed: false,
+    };
+  }
+
+  order.paymentStatus = 'failed';
+  if (order.status === 'pending') {
+    order.status = 'cancelled';
+    order.cancelledAt = new Date();
+  }
+  if (!order.cancelReason && failureCode) {
+    order.cancelReason = `Gateway reported ${failureCode}`;
+  }
+  if (gatewayTransactionId) order.gatewayTransactionId = gatewayTransactionId;
+  if (gatewayPidx) order.gatewayPidx = gatewayPidx;
+  await order.save();
+
+  return {
+    idempotent: false,
+    paymentStatus: order.paymentStatus,
+    orderStatus: order.status,
+    changed: true,
+  };
+};
+
+const parseEsewaWebhookPayload = (body) => {
+  if (typeof body?.data === 'string') {
+    try {
+      return JSON.parse(Buffer.from(body.data, 'base64').toString());
+    } catch {
+      return null;
+    }
+  }
+  return body;
+};
 
 // Initiate order (create pending order before payment)
 export const initiateOrder = async (req, res) => {
@@ -172,11 +331,11 @@ export const generateEsewaSignature = async (req, res) => {
     // Use server-authoritative values — never trust client-supplied amounts
     const total_amount = order.total.toFixed(2);
     const transaction_uuid = String(order._id);
-    const product_code = ESEWA_MERCHANT_CODE;
+    const product_code = getEsewaMerchantCode();
 
     const message = `total_amount=${total_amount},transaction_uuid=${transaction_uuid},product_code=${product_code}`;
     const signature = crypto
-      .createHmac('sha256', ESEWA_SECRET_KEY)
+      .createHmac('sha256', getEsewaSecretKey())
       .update(message)
       .digest('base64');
 
@@ -223,9 +382,9 @@ export const verifyEsewaPayment = async (req, res) => {
 
     // Verify signature from eSewa
     if (signature) {
-      const message = `transaction_code=${transaction_code},status=${status},total_amount=${total_amount},transaction_uuid=${transaction_uuid},product_code=${ESEWA_MERCHANT_CODE},signed_field_names=${signed_field_names}`;
+      const message = `transaction_code=${transaction_code},status=${status},total_amount=${total_amount},transaction_uuid=${transaction_uuid},product_code=${getEsewaMerchantCode()},signed_field_names=${signed_field_names}`;
       const expectedSignature = crypto
-        .createHmac('sha256', ESEWA_SECRET_KEY)
+        .createHmac('sha256', getEsewaSecretKey())
         .update(message)
         .digest('base64');
 
@@ -256,7 +415,7 @@ export const verifyEsewaPayment = async (req, res) => {
     }
 
     // Idempotency guard — already paid, return success without re-decrementing stock
-    if (order.paymentStatus === 'paid') {
+    if (isOrderAlreadyPaid(order)) {
       return res.json({
         success: true,
         message: 'Payment already verified',
@@ -272,47 +431,17 @@ export const verifyEsewaPayment = async (req, res) => {
       });
     }
 
-    // Update order status
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    await settleOrderFromGatewayResult({
+      order,
+      isPaid: true,
+      gatewayTransactionId: transaction_code,
+    });
 
-    try {
-      order.paymentStatus = 'paid';
-      order.status = 'processing';
-      await order.save({ session });
-
-      // Update product stock
-      for (const item of order.items) {
-        const product = await Product.findById(item.product).session(session);
-        
-        if (item.variant) {
-          const variant = product.variants.find(v =>
-            v.color === item.variant.color &&
-            v.size === item.variant.size
-          );
-          if (variant) {
-            variant.quantity -= item.quantity;
-          }
-        }
-        
-        product.stock -= item.quantity;
-        product.sales += item.quantity;
-        await product.save({ session });
-      }
-
-      await session.commitTransaction();
-
-      res.json({
-        success: true,
-        message: 'Payment verified successfully',
-        data: { orderId: order._id, orderNumber: order.orderNumber }
-      });
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    res.json({
+      success: true,
+      message: 'Payment verified successfully',
+      data: { orderId: order._id, orderNumber: order.orderNumber }
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -334,18 +463,7 @@ export const verifyKhaltiPayment = async (req, res) => {
     }
 
     // Verify payment with Khalti
-    const verifyResponse = await axios.post(
-      `${process.env.KHALTI_GATEWAY_URL}/epayment/lookup/`,
-      { pidx },
-      {
-        headers: {
-          'Authorization': `Key ${process.env.KHALTI_SECRET_KEY}`,
-          'Content-Type': 'application/json',
-        }
-      }
-    );
-
-    const paymentData = verifyResponse.data;
+    const paymentData = await lookupKhaltiTransaction(pidx);
 
     if (paymentData.status !== 'Completed') {
       return res.status(400).json({
@@ -373,7 +491,7 @@ export const verifyKhaltiPayment = async (req, res) => {
     }
 
     // Idempotency guard — already paid, return success without re-decrementing stock
-    if (order.paymentStatus === 'paid') {
+    if (isOrderAlreadyPaid(order)) {
       return res.json({
         success: true,
         message: 'Payment already verified',
@@ -390,49 +508,18 @@ export const verifyKhaltiPayment = async (req, res) => {
       });
     }
 
-    // Update order status
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    await settleOrderFromGatewayResult({
+      order,
+      isPaid: true,
+      gatewayTransactionId: transaction_id || paymentData.transaction_id || null,
+      gatewayPidx: pidx,
+    });
 
-    try {
-      order.paymentStatus = 'paid';
-      order.status = 'processing';
-      order.gatewayTransactionId = transaction_id || null;
-      order.gatewayPidx = pidx;
-      await order.save({ session });
-
-      // Update product stock
-      for (const item of order.items) {
-        const product = await Product.findById(item.product).session(session);
-        
-        if (item.variant) {
-          const variant = product.variants.find(v =>
-            v.color === item.variant.color &&
-            v.size === item.variant.size
-          );
-          if (variant) {
-            variant.quantity -= item.quantity;
-          }
-        }
-        
-        product.stock -= item.quantity;
-        product.sales += item.quantity;
-        await product.save({ session });
-      }
-
-      await session.commitTransaction();
-
-      res.json({
-        success: true,
-        message: 'Payment verified successfully',
-        data: { orderId: order._id, orderNumber: order.orderNumber }
-      });
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    res.json({
+      success: true,
+      message: 'Payment verified successfully',
+      data: { orderId: order._id, orderNumber: order.orderNumber }
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -490,6 +577,11 @@ export const initiateKhaltiPayment = async (req, res) => {
       }
     );
 
+    if (response?.data?.pidx) {
+      order.gatewayPidx = response.data.pidx;
+      await order.save();
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('Khalti initiation error:', error.response?.data || error.message);
@@ -497,6 +589,156 @@ export const initiateKhaltiPayment = async (req, res) => {
       success: false,
       message: error.response?.data?.detail || error.message || 'Failed to initiate Khalti payment'
     });
+  }
+};
+
+export const handleKhaltiWebhook = async (req, res) => {
+  try {
+    const providedSecret = req.get('x-webhook-secret') || req.get('x-khalti-webhook-secret');
+    const expectedSecret = getKhaltiWebhookSecret();
+    if (!expectedSecret || !safeStringEquals(providedSecret, expectedSecret)) {
+      return res.status(401).json({ success: false, message: 'Invalid webhook secret' });
+    }
+
+    const { pidx, purchase_order_id, transaction_id } = req.body || {};
+    if (!pidx || !purchase_order_id) {
+      return res.status(400).json({ success: false, message: 'pidx and purchase_order_id are required' });
+    }
+
+    const order = await Order.findById(purchase_order_id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const paymentData = await lookupKhaltiTransaction(pidx);
+    const gatewayStatus = normalizeGatewayStatus(paymentData?.status);
+
+    if (KHALTI_TERMINAL_SUCCESS.has(gatewayStatus)) {
+      const result = await settleOrderFromGatewayResult({
+        order,
+        isPaid: true,
+        gatewayTransactionId: transaction_id || paymentData?.transaction_id || null,
+        gatewayPidx: pidx,
+      });
+      return res.json({
+        success: true,
+        message: result.idempotent ? 'Payment already settled' : 'Payment settled from webhook',
+        data: {
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          paymentStatus: result.paymentStatus,
+          orderStatus: result.orderStatus,
+        },
+      });
+    }
+
+    if (KHALTI_TERMINAL_FAILED.has(gatewayStatus)) {
+      const result = await settleOrderFromGatewayResult({
+        order,
+        isPaid: false,
+        failureCode: gatewayStatus,
+        gatewayPidx: pidx,
+      });
+      return res.json({
+        success: true,
+        message: result.idempotent ? 'Order already in terminal state' : 'Failed payment reconciled from webhook',
+        data: {
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          paymentStatus: result.paymentStatus,
+          orderStatus: result.orderStatus,
+        },
+      });
+    }
+
+    return res.status(202).json({
+      success: true,
+      message: 'Gateway status is not terminal yet',
+      data: { orderId: order._id, status: gatewayStatus || 'UNKNOWN' },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const handleEsewaWebhook = async (req, res) => {
+  try {
+    const payload = parseEsewaWebhookPayload(req.body);
+    if (!payload) {
+      return res.status(400).json({ success: false, message: 'Invalid webhook payload' });
+    }
+
+    const { transaction_uuid, signed_field_names, signature } = payload;
+    if (!transaction_uuid || !signed_field_names || !signature) {
+      return res.status(400).json({ success: false, message: 'transaction_uuid, signed_field_names and signature are required' });
+    }
+
+    const message = getEsewaSignedMessage(payload, signed_field_names);
+    const expectedSignature = crypto
+      .createHmac('sha256', getEsewaSecretKey())
+      .update(message)
+      .digest('base64');
+
+    if (!safeStringEquals(signature, expectedSignature)) {
+      return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+    }
+
+    const order = await Order.findById(transaction_uuid);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const gatewayData = await lookupEsewaTransaction({
+      transaction_uuid: String(order._id),
+      total_amount: order.total,
+    });
+    const gatewayStatus = normalizeGatewayStatus(gatewayData?.status).toUpperCase();
+
+    if (ESEWA_TERMINAL_SUCCESS.has(gatewayStatus)) {
+      const result = await settleOrderFromGatewayResult({
+        order,
+        isPaid: true,
+        gatewayTransactionId: gatewayData?.transaction_code || payload?.transaction_code || null,
+      });
+
+      return res.json({
+        success: true,
+        message: result.idempotent ? 'Payment already settled' : 'Payment settled from webhook',
+        data: {
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          paymentStatus: result.paymentStatus,
+          orderStatus: result.orderStatus,
+        },
+      });
+    }
+
+    if (ESEWA_TERMINAL_FAILED.has(gatewayStatus)) {
+      const result = await settleOrderFromGatewayResult({
+        order,
+        isPaid: false,
+        failureCode: gatewayStatus,
+      });
+
+      return res.json({
+        success: true,
+        message: result.idempotent ? 'Order already in terminal state' : 'Failed payment reconciled from webhook',
+        data: {
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          paymentStatus: result.paymentStatus,
+          orderStatus: result.orderStatus,
+        },
+      });
+    }
+
+    return res.status(202).json({
+      success: true,
+      message: 'Gateway status is not terminal yet',
+      data: { orderId: order._id, status: gatewayStatus || 'UNKNOWN' },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 

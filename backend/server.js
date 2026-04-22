@@ -74,6 +74,8 @@ import heroSlidesRoutes from './routes/heroSlides.js';
 import reviewRoutes from './routes/reviews.js';
 import deliverySettingsRoutes from './routes/deliverySettings.js';
 import uploadsRoutes from './routes/uploads.js';
+import webhooksRoutes from './routes/webhooks.js';
+import { startPaymentReconciliationCron } from './jobs/reconcilePayments.js';
 import { apiVersionMiddleware, restfulCorsMiddleware } from './utils/restful.js';
 
 // Create Express app
@@ -199,6 +201,7 @@ app.use('/api/hero-slides', heroSlidesRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/delivery-settings', deliverySettingsRoutes);
 app.use('/api/uploads', uploadsRoutes);
+app.use('/api/webhooks', webhooksRoutes);
 
 // API Documentation endpoint
 app.get('/api/docs', (req, res) => {
@@ -367,6 +370,9 @@ const PORT = process.env.PORT || 8000;
 
 const startServer = async () => {
   await connectWithRetry();
+  if (process.env.NODE_ENV !== 'test') {
+    startPaymentReconciliationCron();
+  }
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
