@@ -50,7 +50,7 @@ export const createApiClient = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to create API client',
-      error: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -87,7 +87,7 @@ export const getMyApiClients = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch API clients',
-      error: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -115,7 +115,7 @@ export const getApiClientById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch API client',
-      error: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -156,7 +156,7 @@ export const updateApiClient = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update API client',
-      error: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -192,7 +192,7 @@ export const regenerateSecret = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to regenerate secret',
-      error: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -220,7 +220,7 @@ export const deleteApiClient = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete API client',
-      error: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -259,7 +259,7 @@ export const getAllApiClients = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch API clients',
-      error: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -288,7 +288,7 @@ export const revokeApiClient = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to revoke API client',
-      error: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };

@@ -6,6 +6,7 @@ import RefreshSession from '../models/RefreshSession.js';
 import Order from '../models/Order.js';
 import Review from '../models/Review.js';
 import { hashPassword, comparePassword, generateToken, generateRefreshToken, verifyToken } from '../utils/auth.js';
+import logger from '../utils/logger.js';
 import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendOtpEmail } from '../utils/otpEmail.js';
 
 const REFRESH_COOKIE_NAME = 'jg_rt';
@@ -148,7 +149,7 @@ export const requestRegisterOtp = async (req, res) => {
       message: 'Verification OTP sent to your email.'
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -238,7 +239,7 @@ export const verifyRegisterOtp = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -311,7 +312,7 @@ export const login = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -352,7 +353,7 @@ export const refreshToken = async (req, res) => {
         { userId: session.userId, revokedAt: null },
         { revokedAt: new Date() }
       );
-      console.error(`[SECURITY] Refresh token reuse detected for user ${session.userId}. All sessions revoked.`);
+      logger.warn({ userId: String(session.userId) }, '[SECURITY] Refresh token reuse detected — all sessions revoked');
       return res.status(401).json({
         success: false,
         message: 'Refresh token already used. All sessions have been revoked for security.'
@@ -383,7 +384,7 @@ export const refreshToken = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -400,7 +401,7 @@ export const getCurrentUser = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -426,7 +427,7 @@ export const logout = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -447,7 +448,7 @@ export const updateProfile = async (req, res) => {
 
     res.json({ success: true, data: user });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -488,7 +489,7 @@ export const requestForgotPasswordOtp = async (req, res) => {
       message: 'If your email is registered, OTP instructions have been sent.'
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -535,7 +536,7 @@ export const verifyForgotPasswordOtp = async (req, res) => {
 
     res.json({ success: true, message: 'Password reset successfully. Please login with your new password.' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -586,7 +587,7 @@ export const requestChangePasswordOtp = async (req, res) => {
 
     res.json({ success: true, message: 'OTP sent to your email for password change confirmation.' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -631,7 +632,7 @@ export const verifyChangePasswordOtp = async (req, res) => {
 
     res.json({ success: true, message: 'Password changed successfully.' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -717,7 +718,7 @@ export const googleLogin = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -770,7 +771,7 @@ export const requestVendor = async (req, res) => {
       data: { vendorRequest: user.vendorRequest }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -824,7 +825,7 @@ export const reviewVendorRequest = async (req, res) => {
       data: user
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -840,7 +841,7 @@ export const getVendorRequests = async (req, res) => {
       data: users
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -882,6 +883,6 @@ export const deleteAccount = async (req, res) => {
 
     res.json({ success: true, message: 'Account and associated data deleted successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };

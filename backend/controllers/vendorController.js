@@ -68,7 +68,7 @@ export const getVendorStats = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -118,7 +118,7 @@ export const getVendorOrders = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -163,7 +163,7 @@ export const getVendorOrderById = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -192,7 +192,7 @@ export const getProductsSummary = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -247,7 +247,7 @@ export const getVendorDashboard = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -265,7 +265,7 @@ export const getTaxSettings = async (req, res) => {
     }
     res.json({ success: true, data: settings });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -302,7 +302,7 @@ export const updateTaxSettings = async (req, res) => {
 
     res.json({ success: true, data: settings });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(400).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -333,7 +333,7 @@ export const addTaxRule = async (req, res) => {
 
     res.status(201).json({ success: true, data: settings });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(400).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -350,6 +350,6 @@ export const deleteTaxRule = async (req, res) => {
     }
     res.json({ success: true, data: settings });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(400).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };

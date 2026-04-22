@@ -36,7 +36,7 @@ export const getProductReviews = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(errorStatus(error)).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -71,7 +71,7 @@ export const canReview = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(errorStatus(error)).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -142,7 +142,7 @@ export const createReview = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'You have already reviewed this product' });
     }
-    res.status(errorStatus(error)).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -177,6 +177,6 @@ export const deleteReview = async (req, res) => {
 
     res.json({ success: true, message: 'Review deleted' });
   } catch (error) {
-    res.status(errorStatus(error)).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };

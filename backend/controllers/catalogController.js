@@ -65,7 +65,7 @@ export const getCategories = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -100,7 +100,7 @@ export const createCategory = async (req, res) => {
     }
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -132,7 +132,7 @@ export const updateCategory = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -155,7 +155,7 @@ export const deleteCategory = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -207,7 +207,7 @@ export const getBrands = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -242,7 +242,7 @@ export const createBrand = async (req, res) => {
     }
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -274,7 +274,7 @@ export const updateBrand = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -297,7 +297,7 @@ export const deleteBrand = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };

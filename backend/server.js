@@ -49,11 +49,7 @@ const assertRequiredEnv = () => {
   }
 
   if (missing.length > 0) {
-    console.error('');
-    console.error('ERROR: The following required environment variables are not set:');
-    for (const key of missing) console.error(`  - ${key}`);
-    console.error('');
-    console.error('Copy .env.example to .env and fill in the missing values.');
+    logger.error({ missing }, 'Missing required environment variables — copy .env.example to .env and fill in the values');
     process.exit(1);
   }
 };
@@ -78,6 +74,9 @@ import webhooksRoutes from './routes/webhooks.js';
 import { startPaymentReconciliationCron } from './jobs/reconcilePayments.js';
 import { apiVersionMiddleware, restfulCorsMiddleware } from './utils/restful.js';
 import { authenticate, optionalAuth, requireAdmin } from './middleware/auth.js';
+import { requestId as requestIdMiddleware } from './middleware/requestId.js';
+import logger from './utils/logger.js';
+import pinoHttp from 'pino-http';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
@@ -92,6 +91,17 @@ const app = express();
 // Trust the first proxy hop so req.ip reflects the real client IP.
 // Must be set before any rate limiter is registered.
 app.set('trust proxy', 1);
+
+// Attach a unique request ID to every request and echo it as a response header.
+app.use(requestIdMiddleware);
+
+// HTTP request logging via pino.
+app.use(pinoHttp({
+  logger,
+  // Enrich pino-http log records with req.id so every log line is correlated.
+  genReqId: (req) => req.id,
+  customLogLevel: (_req, res) => (res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'),
+}));
 
 // Security middleware
 app.use(helmet());
@@ -158,10 +168,9 @@ app.use(compression());
 app.use(apiVersionMiddleware);
 app.use(restfulCorsMiddleware);
 
-// Add API version to response header
-app.use((req, res, next) => {
+// Add API version to response header (X-Powered-By intentionally omitted to avoid fingerprinting).
+app.use((_req, res, next) => {
   res.header('X-API-Version', '1.0.0');
-  res.header('X-Powered-By', 'JutaGhar API');
   next();
 });
 
@@ -171,26 +180,25 @@ const connectWithRetry = async (maxRetries = 10, delay = 3000) => {
   const uri = process.env.MONGODB_URI;
   
   if (!uri) {
-    console.error('MONGODB_URI is not defined in environment variables');
+    logger.fatal('MONGODB_URI is not defined in environment variables');
     process.exit(1);
   }
-  
+
   while (attempts < maxRetries) {
     try {
       await mongoose.connect(uri);
-      console.log('MongoDB Atlas Connected');
-      console.log(`Database: ${mongoose.connection.name}`);
+      logger.info({ db: mongoose.connection.name }, 'MongoDB Atlas connected');
       return;
     } catch (err) {
       attempts += 1;
-      console.error(`MongoDB Connection Error (attempt ${attempts}):`, err.message || err);
+      logger.error({ err, attempt: attempts }, 'MongoDB connection error');
       if (attempts >= maxRetries) {
-        console.error('Exceeded maximum MongoDB connection attempts. Exiting.');
+        logger.fatal('Exceeded maximum MongoDB connection attempts — exiting');
         process.exit(1);
       }
-      console.log(`Retrying MongoDB connection in ${delay}ms...`);
+      logger.info({ delayMs: delay }, 'Retrying MongoDB connection');
       // eslint-disable-next-line no-await-in-loop
-      await new Promise((res) => setTimeout(res, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 };
@@ -327,13 +335,21 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
+// Global error handler.
+// - Always logs the full error + stack server-side (correlated by requestId).
+// - In production, returns a generic message so internal details are never leaked.
+// - In development, includes the stack for easier debugging.
+app.use((err, req, res, _next) => {
+  logger.error({ err, requestId: req.id }, 'Unhandled request error');
+
+  const status = err.status || err.statusCode || 500;
+  const isProd = process.env.NODE_ENV === 'production';
+
+  res.status(status).json({
     success: false,
-    message: err.message || 'Internal Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: isProd ? 'Something went wrong' : (err.message || 'Internal Server Error'),
+    requestId: req.id,
+    ...((!isProd) && { stack: err.stack }),
   });
 });
 
@@ -354,8 +370,7 @@ const startServer = async () => {
     startPaymentReconciliationCron();
   }
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server running');
   });
 };
 

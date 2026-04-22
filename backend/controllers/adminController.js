@@ -55,7 +55,7 @@ export const getAllUsers = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -81,7 +81,7 @@ export const getUserById = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -119,7 +119,7 @@ export const updateUserStatus = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -157,7 +157,7 @@ export const updateUserRole = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -177,7 +177,7 @@ export const getPendingVendors = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -225,7 +225,7 @@ export const getAllVendors = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -264,7 +264,7 @@ export const updateVendorStatus = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -301,7 +301,7 @@ export const approveVendor = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -339,7 +339,7 @@ export const rejectVendor = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -410,7 +410,7 @@ export const getAdminStats = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };

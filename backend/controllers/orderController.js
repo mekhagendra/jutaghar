@@ -185,7 +185,7 @@ export const createOrder = async (req, res) => {
     await session.abortTransaction();
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   } finally {
     session.endSession();
@@ -229,7 +229,7 @@ export const getUserOrders = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -267,7 +267,7 @@ export const getOrderById = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -318,7 +318,7 @@ export const cancelOrder = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -358,7 +358,7 @@ export const trackOrder = async (req, res) => {
 
     res.json({ success: true, data: safeOrder });
   } catch (error) {
-    res.status(errorStatus(error)).json({ success: false, message: error.message });
+    res.status(errorStatus(error)).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -400,7 +400,7 @@ export const getVendorOrders = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -516,7 +516,7 @@ export const updateOrderStatus = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };

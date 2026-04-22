@@ -140,7 +140,7 @@ export const getProducts = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -171,7 +171,7 @@ export const getProductById = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -207,7 +207,7 @@ export const createProduct = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -244,7 +244,7 @@ export const updateProduct = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -279,7 +279,7 @@ export const deleteProduct = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -322,7 +322,7 @@ export const getVendorProducts = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -374,7 +374,7 @@ export const updateVariantQuantity = async (req, res) => {
   } catch (error) {
     res.status(errorStatus(error)).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -413,7 +413,7 @@ export const recalculateAllStock = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -433,6 +433,6 @@ export const getProductColors = async (req, res) => {
       data: colors.map(c => c.name)
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };

@@ -6,7 +6,7 @@ export const getDeliverySettings = async (_req, res) => {
     const settings = await DeliverySettings.getSettings();
     res.json({ success: true, data: settings });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -29,6 +29,6 @@ export const updateDeliverySettings = async (req, res) => {
 
     res.json({ success: true, data: settings });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };

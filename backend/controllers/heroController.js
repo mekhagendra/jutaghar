@@ -6,7 +6,7 @@ export const getHeroSlides = async (req, res) => {
     const slides = await HeroSlide.find({ isActive: true }).sort('order -createdAt');
     res.json({ success: true, data: slides });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -16,7 +16,7 @@ export const getAllHeroSlides = async (req, res) => {
     const slides = await HeroSlide.find().sort('order -createdAt');
     res.json({ success: true, data: slides });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -43,7 +43,7 @@ export const createHeroSlide = async (req, res) => {
 
     res.status(201).json({ success: true, data: slide });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -70,7 +70,7 @@ export const updateHeroSlide = async (req, res) => {
 
     res.json({ success: true, data: slide });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -87,6 +87,6 @@ export const deleteHeroSlide = async (req, res) => {
 
     res.json({ success: true, message: 'Hero slide deleted successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };

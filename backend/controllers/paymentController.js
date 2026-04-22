@@ -5,6 +5,7 @@ import Product from '../models/Product.js';
 import mongoose from 'mongoose';
 import DeliverySettings from '../models/DeliverySettings.js';
 import { calculateTaxForItems } from '../utils/taxCalculator.js';
+import logger from '../utils/logger.js';
 
 // eSewa configuration — fail fast if secrets are absent
 if (!process.env.ESEWA_SECRET_KEY) {
@@ -295,7 +296,7 @@ export const initiateOrder = async (req, res) => {
     await session.abortTransaction();
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   } finally {
     session.endSession();
@@ -445,7 +446,7 @@ export const verifyEsewaPayment = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -523,7 +524,7 @@ export const verifyKhaltiPayment = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Internal error', requestId: req.id
     });
   }
 };
@@ -584,10 +585,11 @@ export const initiateKhaltiPayment = async (req, res) => {
 
     res.json(response.data);
   } catch (error) {
-    console.error('Khalti initiation error:', error.response?.data || error.message);
+    logger.error({ err: error, responseData: error.response?.data }, 'Khalti initiation error');
     res.status(500).json({
       success: false,
-      message: error.response?.data?.detail || error.message || 'Failed to initiate Khalti payment'
+      message: 'Failed to initiate payment',
+      requestId: req.id,
     });
   }
 };
@@ -657,7 +659,7 @@ export const handleKhaltiWebhook = async (req, res) => {
       data: { orderId: order._id, status: gatewayStatus || 'UNKNOWN' },
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -738,7 +740,7 @@ export const handleEsewaWebhook = async (req, res) => {
       data: { orderId: order._id, status: gatewayStatus || 'UNKNOWN' },
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
@@ -786,7 +788,7 @@ export const estimateTax = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
 
