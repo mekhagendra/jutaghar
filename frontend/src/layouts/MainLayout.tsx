@@ -1,5 +1,7 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
+import Topbar from '../components/Topbar';
+import Brandbar from '../components/Brandbar';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
@@ -23,6 +25,8 @@ const MainLayout: React.FC = () => {
         - Main Nav: Logo, Menu (Men/Women/Kids/New/Best), Cart, User menu
         - Sticky positioning for persistent navigation
       */}
+      <Topbar />
+      <Brandbar />
       <Navbar />
       
       {/* Main Content Area - Flex-1 ensures it fills available space */}

@@ -9,8 +9,8 @@ router.get('/', async (req, res) => {
   try {
     const { isApproved } = req.query;
     
-    const query = { 
-      role: 'outlet',
+    const query = {
+      role: 'seller',
       isActive: true
     };
     

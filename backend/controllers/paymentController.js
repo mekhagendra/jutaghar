@@ -27,7 +27,6 @@ const ESEWA_TERMINAL_SUCCESS = new Set(['COMPLETE']);
 const ESEWA_TERMINAL_FAILED = new Set(['CANCELED', 'CANCELLED', 'FAILED', 'NOT_FOUND', 'EXPIRED', 'FULL_REFUND', 'REFUNDED']);
 
 const normalizeGatewayStatus = (value) => String(value || '').trim();
-
 class StockConflictError extends Error {
   constructor(productName) {
     super(`Insufficient stock for ${productName}`);

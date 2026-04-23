@@ -144,7 +144,7 @@ export const updateUserRole = async (req, res) => {
     const sanitizedBody = stripOperators({ ...req.body });
     const role = asString(sanitizedBody.role || '');
 
-    if (!['admin', 'outlet', 'user'].includes(role)) {
+    if (!['admin', 'manager', 'seller', 'customer'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role'

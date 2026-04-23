@@ -1,0 +1,4 @@
+/**
+ * Profile feature barrel
+ */
+export {};

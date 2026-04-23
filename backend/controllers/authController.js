@@ -1,17 +1,19 @@
 import { validationResult } from 'express-validator';
 import { OAuth2Client } from 'google-auth-library';
-import User from '../models/User.js';
+import { OTP } from 'otplib';
+import qrcode from 'qrcode';
+import Order from '../models/Order.js';
 import PendingRegistration from '../models/PendingRegistration.js';
 import RefreshSession from '../models/RefreshSession.js';
-import Order from '../models/Order.js';
 import Review from '../models/Review.js';
-import { hashPassword, comparePassword, generateToken, generateRefreshToken, verifyToken, generateMfaToken } from '../utils/auth.js';
-import logger from '../utils/logger.js';
-import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendOtpEmail, sendAccountExistsEmail } from '../utils/otpEmail.js';
-import { authenticator } from 'otplib';
-import qrcode from 'qrcode';
-import { encryptSecret, decryptSecret, generateRecoveryCodes, hashRecoveryCodes, findRecoveryCodeIndex } from '../utils/mfa.js';
+import User from '../models/User.js';
 import { writeAudit } from '../utils/audit.js';
+import { comparePassword, generateMfaToken, generateRefreshToken, generateToken, hashPassword, verifyToken } from '../utils/auth.js';
+import logger from '../utils/logger.js';
+import { decryptSecret, encryptSecret, findRecoveryCodeIndex, generateRecoveryCodes, hashRecoveryCodes } from '../utils/mfa.js';
+import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendAccountExistsEmail, sendOtpEmail } from '../utils/otpEmail.js';
+
+const totpAuthenticator = new OTP({ strategy: 'totp' });
 
 const REFRESH_COOKIE_NAME = 'jg_rt';
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -84,6 +86,7 @@ function toAuthUser(user) {
     businessName: user.businessName,
     avatar: user.avatar,
     vendorRequest: user.vendorRequest,
+    mfa: { enabled: !!user.mfa?.enabled },
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
@@ -208,7 +211,7 @@ export const verifyRegisterOtp = async (req, res) => {
       password: pendingRegistration.passwordHash,
       fullName: pendingRegistration.fullName,
       phone: pendingRegistration.phone,
-      role: 'user',
+      role: 'customer',
       status: 'active',
       emailVerified: true,
       emailVerification: {
@@ -307,14 +310,14 @@ export const login = async (req, res) => {
       });
     }
 
-    if (user.status === 'pending' && user.role === 'outlet') {
+    if (user.status === 'pending' && user.role === 'seller') {
       await writeAudit({
         req,
         actor: String(user._id),
         action: 'AUTH_LOGIN_FAILED',
         target: 'user',
         targetId: user._id,
-        metadata: { email, reason: 'outlet_pending_approval' },
+        metadata: { email, reason: 'seller_pending_approval' },
       });
       return res.status(403).json({
         success: false,
@@ -337,8 +340,8 @@ export const login = async (req, res) => {
       });
     }
 
-    // MFA gate for admin / outlet roles
-    if (['admin', 'manager', 'outlet'].includes(user.role) && user.mfa?.enabled) {
+    // MFA gate for privileged roles
+    if (['admin', 'manager', 'seller'].includes(user.role) && user.mfa?.enabled) {
       const mfa_token = generateMfaToken(user._id);
       await writeAudit({
         req,
@@ -456,8 +459,9 @@ export const refreshToken = async (req, res) => {
 // Get current user
 export const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password -passwordReset -passwordChange -emailVerification');
-    
+    const user = await User.findById(req.user._id)
+      .select('-password -passwordReset -passwordChange -emailVerification -mfa.secret -mfa.pendingSecret -mfa.recoveryCodes');
+
     res.json({
       success: true,
       data: user
@@ -622,102 +626,6 @@ export const verifyForgotPasswordOtp = async (req, res) => {
   }
 };
 
-export const requestChangePasswordOtp = async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.user._id);
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    if (!user.password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password change is not available for this account. Use Google sign-in account settings.'
-      });
-    }
-
-    const isMatch = await comparePassword(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Current password is incorrect' });
-    }
-
-    if (currentPassword === newPassword) {
-      return res.status(400).json({ success: false, message: 'New password must be different from current password' });
-    }
-
-    const otp = generateOtp();
-    user.passwordChange = {
-      otpHash: hashOtp(otp),
-      otpExpiresAt: getOtpExpiryDate(),
-      pendingPassword: await hashPassword(newPassword)
-    };
-    await user.save();
-
-    await sendOtpEmail({
-      to: user.email,
-      subject: 'Confirm password change for JutaGhar',
-      purpose: 'your password change',
-      otp
-    });
-
-    res.json({ success: true, message: 'OTP sent to your email for password change confirmation.' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
-  }
-};
-
-export const verifyChangePasswordOtp = async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const otp = String(req.body.otp).trim();
-    const user = await User.findById(req.user._id);
-
-    if (!user || !user.passwordChange?.otpHash || !user.passwordChange?.pendingPassword) {
-      return res.status(400).json({ success: false, message: 'No pending password change request found' });
-    }
-
-    if (isOtpExpired(user.passwordChange.otpExpiresAt)) {
-      user.passwordChange = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
-      await user.save();
-      return res.status(400).json({ success: false, message: 'OTP has expired. Request a new one.' });
-    }
-
-    // Lockout check
-    if (user.passwordChange.lockedUntil && user.passwordChange.lockedUntil > new Date()) {
-      return res.status(429).json({ success: false, message: 'Too many incorrect OTP attempts. Try again in 15 minutes.' });
-    }
-
-    if (user.passwordChange.otpHash !== hashOtp(otp)) {
-      user.passwordChange.attempts = (user.passwordChange.attempts || 0) + 1;
-      if (user.passwordChange.attempts >= 5) {
-        user.passwordChange.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
-      }
-      await user.save();
-      return res.status(400).json({ success: false, message: 'Invalid OTP' });
-    }
-
-    // Correct OTP — reset counters and apply pending password
-    user.password = user.passwordChange.pendingPassword;
-    user.passwordChange = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
-    await user.save();
-
-    res.json({ success: true, message: 'Password changed successfully.' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
-  }
-};
-
 // Google Sign-In / Sign-Up
 export const googleLogin = async (req, res) => {
   try {
@@ -763,7 +671,7 @@ export const googleLogin = async (req, res) => {
         fullName: name || email.split('@')[0],
         googleId,
         avatar: picture,
-        role: 'user',
+        role: 'customer',
         status: 'active',
         emailVerified: true,
       });
@@ -777,7 +685,7 @@ export const googleLogin = async (req, res) => {
       });
     }
 
-    if (user.status === 'pending' && user.role === 'outlet') {
+    if (user.status === 'pending' && user.role === 'seller') {
       return res.status(403).json({
         success: false,
         message: 'Account is pending approval'
@@ -822,11 +730,11 @@ export const requestVendor = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Only regular users can request vendor status
-    if (user.role !== 'user') {
+    // Only customers can request seller status
+    if (user.role !== 'customer') {
       return res.status(400).json({
         success: false,
-        message: 'Only regular users can request vendor status'
+        message: 'Only customers can request seller status'
       });
     }
 
@@ -882,8 +790,8 @@ export const reviewVendorRequest = async (req, res) => {
     }
 
     if (action === 'approve') {
-      // Promote user to vendor
-      user.role = user.vendorRequest.type;
+      // Promote customer to seller
+      user.role = 'seller';
       user.businessName = user.vendorRequest.businessName;
       user.businessAddress = user.vendorRequest.businessAddress;
       user.taxId = user.vendorRequest.taxId;
@@ -962,9 +870,9 @@ export const deleteAccount = async (req, res) => {
       }
     }
 
-    // Prevent admin/outlet from self-deleting via this endpoint
-    if (user.role === 'admin' || user.role === 'outlet') {
-      return res.status(403).json({ success: false, message: 'Admin and vendor accounts cannot be deleted via this endpoint. Please contact support.' });
+    // Prevent admin/seller from self-deleting via this endpoint
+    if (user.role === 'admin' || user.role === 'seller') {
+      return res.status(403).json({ success: false, message: 'Admin and seller accounts cannot be deleted via this endpoint. Please contact support.' });
     }
 
     // Delete user's reviews
@@ -1003,8 +911,12 @@ export const setupMfa = async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const secret = authenticator.generateSecret();
-    const otpauthUri = authenticator.keyuri(user.email, 'JutaGhar', secret);
+    const secret = totpAuthenticator.generateSecret();
+    const otpauthUri = totpAuthenticator.generateURI({
+      issuer: 'JutaGhar',
+      label: user.email,
+      secret,
+    });
     const qrDataUrl = await qrcode.toDataURL(otpauthUri);
 
     // Store encrypted pending secret (not enabled until /mfa/verify succeeds)
@@ -1040,7 +952,7 @@ export const verifyMfaSetup = async (req, res) => {
     const { code } = req.body;
     const secret = decryptSecret(user.mfa.pendingSecret);
 
-    if (!authenticator.check(String(code), secret)) {
+    if (!totpAuthenticator.verifySync({ token: String(code), secret })) {
       return res.status(400).json({ success: false, message: 'Invalid TOTP code' });
     }
 
@@ -1089,7 +1001,7 @@ export const disableMfa = async (req, res) => {
 
     // Verify TOTP code or recovery code
     const secret = decryptSecret(user.mfa.secret);
-    const totpValid = authenticator.check(String(code), secret);
+    const totpValid = totpAuthenticator.verifySync({ token: String(code), secret });
 
     if (!totpValid) {
       // Try recovery codes
@@ -1137,7 +1049,7 @@ export const loginVerifyMfa = async (req, res) => {
     }
 
     const secret = decryptSecret(user.mfa.secret);
-    const totpValid = authenticator.check(String(code), secret);
+    const totpValid = totpAuthenticator.verifySync({ token: String(code), secret });
 
     if (!totpValid) {
       // Try recovery codes
@@ -1164,6 +1076,122 @@ export const loginVerifyMfa = async (req, res) => {
       }
     });
   } catch (error) {
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
+  }
+};
+
+// ─── Change Password (authenticated, OTP-confirmed) ──────────────────────────
+
+export const requestChangePasswordOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Must have a password-based account
+    if (!user.password) {
+      return res.status(400).json({ success: false, message: 'Password change is not available for social-login accounts' });
+    }
+
+    const isMatch = await comparePassword(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ success: false, message: 'New password must differ from the current password' });
+    }
+
+    // Store hashed new password temporarily and send OTP
+    const otp = generateOtp();
+    user.passwordChange = {
+      otpHash: hashOtp(otp),
+      otpExpiresAt: getOtpExpiryDate(),
+      pendingPassword: await hashPassword(newPassword),
+      attempts: 0,
+      lockedUntil: null,
+    };
+    await user.save();
+
+    await sendOtpEmail({
+      to: user.email,
+      subject: 'Confirm your JutaGhar password change',
+      purpose: 'your password change',
+      otp,
+    });
+
+    await writeAudit({
+      req,
+      actor: String(user._id),
+      action: 'AUTH_CHANGE_PASSWORD_OTP_REQUESTED',
+      target: 'user',
+      targetId: user._id,
+      metadata: { email: user.email },
+    });
+
+    res.json({ success: true, message: 'OTP sent to your email. Enter it to confirm the password change.' });
+  } catch (error) {
+    logger.error('requestChangePasswordOtp error', { error });
+    res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
+  }
+};
+
+export const verifyChangePasswordOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const otp = String(req.body.otp).trim();
+    const user = await User.findById(req.user._id);
+    if (!user || !user.passwordChange?.otpHash) {
+      return res.status(400).json({ success: false, message: 'No pending password change. Please start over.' });
+    }
+
+    if (isOtpExpired(user.passwordChange.otpExpiresAt)) {
+      user.passwordChange = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
+      await user.save();
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
+    }
+
+    if (user.passwordChange.lockedUntil && user.passwordChange.lockedUntil > new Date()) {
+      return res.status(429).json({ success: false, message: 'Too many incorrect attempts. Try again in 15 minutes.' });
+    }
+
+    if (user.passwordChange.otpHash !== hashOtp(otp)) {
+      user.passwordChange.attempts = (user.passwordChange.attempts || 0) + 1;
+      if (user.passwordChange.attempts >= 5) {
+        user.passwordChange.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+      }
+      await user.save();
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    // Apply the pending hashed password and clear the change state
+    user.password = user.passwordChange.pendingPassword;
+    user.passwordChange = { otpHash: null, otpExpiresAt: null, pendingPassword: null, attempts: 0, lockedUntil: null };
+    await user.save();
+
+    await writeAudit({
+      req,
+      actor: String(user._id),
+      action: 'AUTH_CHANGE_PASSWORD_VERIFIED',
+      target: 'user',
+      targetId: user._id,
+      metadata: { email: user.email },
+    });
+
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (error) {
+    logger.error('verifyChangePasswordOtp error', { error });
     res.status(500).json({ success: false, message: 'Internal error', requestId: req.id });
   }
 };
