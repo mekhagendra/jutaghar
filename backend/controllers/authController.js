@@ -1,6 +1,6 @@
 import { validationResult } from 'express-validator';
 import { OAuth2Client } from 'google-auth-library';
-import { OTP } from 'otplib';
+import { authenticator as totpAuthenticator } from 'otplib';
 import qrcode from 'qrcode';
 import Order from '../models/Order.js';
 import PendingRegistration from '../models/PendingRegistration.js';
@@ -12,8 +12,6 @@ import { comparePassword, generateMfaToken, generateRefreshToken, generateToken,
 import logger from '../utils/logger.js';
 import { decryptSecret, encryptSecret, findRecoveryCodeIndex, generateRecoveryCodes, hashRecoveryCodes } from '../utils/mfa.js';
 import { generateOtp, getOtpExpiryDate, hashOtp, isOtpExpired, sendAccountExistsEmail, sendOtpEmail } from '../utils/otpEmail.js';
-
-const totpAuthenticator = new OTP({ strategy: 'totp' });
 
 const REFRESH_COOKIE_NAME = 'jg_rt';
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -912,11 +910,7 @@ export const setupMfa = async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const secret = totpAuthenticator.generateSecret();
-    const otpauthUri = totpAuthenticator.generateURI({
-      issuer: 'JutaGhar',
-      label: user.email,
-      secret,
-    });
+    const otpauthUri = totpAuthenticator.keyuri(user.email, 'JutaGhar', secret);
     const qrDataUrl = await qrcode.toDataURL(otpauthUri);
 
     // Store encrypted pending secret (not enabled until /mfa/verify succeeds)
@@ -952,7 +946,7 @@ export const verifyMfaSetup = async (req, res) => {
     const { code } = req.body;
     const secret = decryptSecret(user.mfa.pendingSecret);
 
-    if (!totpAuthenticator.verifySync({ token: String(code), secret })) {
+    if (!totpAuthenticator.check(String(code), secret)) {
       return res.status(400).json({ success: false, message: 'Invalid TOTP code' });
     }
 
@@ -1001,7 +995,7 @@ export const disableMfa = async (req, res) => {
 
     // Verify TOTP code or recovery code
     const secret = decryptSecret(user.mfa.secret);
-    const totpValid = totpAuthenticator.verifySync({ token: String(code), secret });
+    const totpValid = totpAuthenticator.check(String(code), secret);
 
     if (!totpValid) {
       // Try recovery codes
@@ -1049,7 +1043,7 @@ export const loginVerifyMfa = async (req, res) => {
     }
 
     const secret = decryptSecret(user.mfa.secret);
-    const totpValid = totpAuthenticator.verifySync({ token: String(code), secret });
+    const totpValid = totpAuthenticator.check(String(code), secret);
 
     if (!totpValid) {
       // Try recovery codes
