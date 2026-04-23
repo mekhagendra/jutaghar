@@ -17,8 +17,8 @@ const getRequiredEnv = (name) => {
   return value;
 };
 
-const getEsewaSecretKey = () => getRequiredEnv('ESEWA_SECRET_KEY');
-const getEsewaMerchantCode = () => getRequiredEnv('ESEWA_MERCHANT_CODE');
+const getEsewaSecretKey = () => process.env.ESEWA_SECRET_KEY;
+const getEsewaMerchantCode = () => process.env.ESEWA_MERCHANT_CODE;
 const getKhaltiWebhookSecret = () => process.env.KHALTI_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET || '';
 const ESEWA_STATUS_CHECK_URL = process.env.ESEWA_STATUS_CHECK_URL || 'https://rc.esewa.com.np/api/epay/transaction/status/';
 
