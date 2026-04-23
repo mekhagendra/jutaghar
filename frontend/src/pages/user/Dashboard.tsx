@@ -60,7 +60,7 @@ const UserDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order: { _id: string; orderNumber: string; createdAt: string; status: string; totalAmount: number }) => (
+                {orders.map((order: { _id: string; orderNumber: string; createdAt: string; status: string; total?: number; totalAmount?: number }) => (
                   <tr key={order._id} className="border-b hover:bg-gray-50">
                     <td className="py-3 px-4 font-medium">{order.orderNumber}</td>
                     <td className="py-3 px-4">{formatDate(order.createdAt)}</td>
@@ -69,7 +69,7 @@ const UserDashboard: React.FC = () => {
                         {order.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4">{formatCurrency(order.totalAmount)}</td>
+                    <td className="py-3 px-4">{formatCurrency(order.total ?? order.totalAmount ?? 0)}</td>
                     <td className="py-3 px-4">
                       <Link to={`/orders/${order._id}`} className="text-primary-600 hover:text-primary-700">
                         View

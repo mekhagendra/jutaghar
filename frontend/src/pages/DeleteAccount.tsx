@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -27,8 +28,12 @@ const DeleteAccount: React.FC = () => {
       setSuccess(true);
       logout();
       setTimeout(() => navigate('/'), 3000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete account. Please try again.');
+    } catch (err: unknown) {
+      if (axios.isAxiosError<{ message?: string }>(err)) {
+        setError(err.response?.data?.message || 'Failed to delete account. Please try again.');
+      } else {
+        setError('Failed to delete account. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

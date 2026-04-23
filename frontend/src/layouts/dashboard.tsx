@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -10,9 +10,7 @@ import {
   Truck,
   ShoppingBag,
   Heart,
-  User,
   PlusCircle,
-  Boxes,
   ClipboardList,
   LogOut,
   Menu,
@@ -20,9 +18,17 @@ import {
   ChevronRight,
   Home,
   Receipt,
+  Settings,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@/types';
+import { getAccountActions } from '@/lib/accountActions';
+import {
+  ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS,
+  ACCOUNT_DROPDOWN_ITEM_CLASS,
+  ACCOUNT_DROPDOWN_PANEL_CLASS,
+} from '@/lib/accountDropdownStyles';
 
 interface NavItem {
   to: string;
@@ -33,36 +39,35 @@ interface NavItem {
 
 const adminNav: NavItem[] = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/admin/users', label: 'Users', icon: Users },
-  { to: '/admin/categories', label: 'Categories', icon: Tag },
-  { to: '/admin/brands', label: 'Brands', icon: Bookmark },
-  { to: '/admin/products', label: 'Products', icon: Package },
+  { to: '/admin/users', label: 'Manage User', icon: Users },
+  { to: '/admin/categories', label: 'Manage Categories', icon: Tag },
+  { to: '/admin/brands', label: 'Manage Brands', icon: Bookmark },
+  { to: '/admin/products', label: 'Manage Products', icon: Package },
   { to: '/admin/hero-slides', label: 'Hero Slides', icon: Image },
-  { to: '/admin/delivery-settings', label: 'Delivery Settings', icon: Truck },
+  { to: '/admin/delivery-settings', label: 'Delivery Setting', icon: Truck },
 ];
 
-const vendorNav: NavItem[] = [
+const sellerNav: NavItem[] = [
   { to: '/vendor/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/products/new', label: 'Add Product', icon: PlusCircle, end: true },
+  { to: '/products/new', label: 'Add Products', icon: PlusCircle, end: true },
   { to: '/products/manage', label: 'Manage Products', icon: Package, end: true },
-  { to: '/inventory/manage', label: 'Manage Inventory', icon: Boxes, end: true },
-  { to: '/vendor/orders', label: 'Orders', icon: ClipboardList, end: true },
-  { to: '/vendor/tax', label: 'Tax Settings', icon: Receipt, end: true },
+  { to: '/vendor/orders', label: 'Manage Orders', icon: ClipboardList, end: true },
+  { to: '/vendor/tax', label: 'Manage Tax', icon: Receipt, end: true },
 ];
 
 const customerNav: NavItem[] = [
-  { to: '/user/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/user/orders', label: 'My Orders', icon: ShoppingBag, end: true },
-  { to: '/user/wishlist', label: 'Wishlist', icon: Heart, end: true },
-  { to: '/user/profile', label: 'Profile', icon: User, end: true },
+  { to: '/user/dashboard', label: 'My Order', icon: ShoppingBag, end: true },
+  { to: '/cart', label: 'My Cart', icon: Package, end: true },
+  { to: '/user/wishlist', label: 'My Wishlist', icon: Heart, end: true },
 ];
 
-type PortalType = 'admin' | 'vendor' | 'customer';
+type PortalType = 'admin' | 'seller' | 'customer';
 
 const getPortalType = (role: UserRole | undefined): PortalType => {
-  if (role === 'admin' || role === 'manager') return 'admin';
-  if (role === 'user' || !role) return 'customer';
-  return 'vendor'; // outlet
+  if (role === 'admin') return 'admin';
+  if (role === 'manager') return 'admin';
+  if (role === 'customer' || !role) return 'customer';
+  return 'seller'; // seller
 };
 
 interface PortalConfig {
@@ -83,31 +88,31 @@ interface PortalConfig {
 const configs: Record<PortalType, PortalConfig> = {
   admin: {
     title: 'Admin Panel',
-    dark: true,
-    sidebarClass: 'bg-gray-900',
-    divider: 'border-gray-700',
-    avatarBg: 'bg-blue-700',
-    avatarText: 'text-white',
-    subText: 'text-gray-400',
-    activeLink: 'bg-blue-600 text-white',
-    inactiveLink: 'text-gray-300',
-    inactiveHover: 'hover:bg-gray-700 hover:text-white',
-    logoutHover: 'hover:bg-red-600 hover:text-white',
+    dark: false,
+    sidebarClass: 'bg-white border-r border-gray-200',
+    divider: 'border-gray-100',
+    avatarBg: 'bg-primary-100',
+    avatarText: 'text-primary-700',
+    subText: 'text-gray-500',
+    activeLink: 'bg-primary-50 text-primary-700',
+    inactiveLink: 'text-gray-600',
+    inactiveHover: 'hover:bg-gray-100 hover:text-gray-900',
+    logoutHover: 'hover:bg-red-50 hover:text-red-600',
     navItems: adminNav,
   },
-  vendor: {
-    title: 'Vendor Panel',
-    dark: true,
-    sidebarClass: 'bg-gray-800',
-    divider: 'border-gray-700',
-    avatarBg: 'bg-green-700',
-    avatarText: 'text-white',
-    subText: 'text-gray-400',
-    activeLink: 'bg-green-600 text-white',
-    inactiveLink: 'text-gray-300',
-    inactiveHover: 'hover:bg-gray-700 hover:text-white',
-    logoutHover: 'hover:bg-red-600 hover:text-white',
-    navItems: vendorNav,
+  seller: {
+    title: 'Seller Dashboard',
+    dark: false,
+    sidebarClass: 'bg-white border-r border-gray-200',
+    divider: 'border-gray-100',
+    avatarBg: 'bg-primary-100',
+    avatarText: 'text-primary-700',
+    subText: 'text-gray-500',
+    activeLink: 'bg-primary-50 text-primary-700',
+    inactiveLink: 'text-gray-600',
+    inactiveHover: 'hover:bg-gray-100 hover:text-gray-900',
+    logoutHover: 'hover:bg-red-50 hover:text-red-600',
+    navItems: sellerNav,
   },
   customer: {
     title: 'My Account',
@@ -128,28 +133,70 @@ const configs: Record<PortalType, PortalConfig> = {
 const DashboardLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [desktopAccountOpen, setDesktopAccountOpen] = useState(false);
+  const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const desktopAccountRef = useRef<HTMLDivElement>(null);
+  const mobileAccountRef = useRef<HTMLDivElement>(null);
 
   const portalType = getPortalType(user?.role);
   const cfg = configs[portalType];
 
   const displayName =
-    portalType === 'vendor'
-      ? (user?.businessName ?? user?.fullName ?? 'Vendor')
+    portalType === 'seller'
+      ? (user?.businessName ?? user?.fullName ?? 'Seller')
       : (user?.fullName ?? 'User');
 
   const displaySub =
-    portalType === 'vendor'
+    portalType === 'seller'
       ? (user?.role ?? '')
       : portalType === 'admin'
       ? (user?.role ?? '')
       : (user?.email ?? '');
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
+
+  const accountActions = useMemo(
+    () =>
+      getAccountActions({
+        isAuthenticated: !!user,
+        user: user ?? null,
+        logout: handleLogout,
+        isHomePage: false,
+      }),
+    [user, handleLogout]
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (desktopAccountRef.current && !desktopAccountRef.current.contains(target)) {
+        setDesktopAccountOpen(false);
+      }
+      if (mobileAccountRef.current && !mobileAccountRef.current.contains(target)) {
+        setMobileAccountOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDesktopAccountOpen(false);
+        setMobileAccountOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   // Shared nav item renderer — accepts optional click handler (for drawer close)
   const renderNavItems = (onItemClick?: () => void) =>
@@ -282,8 +329,65 @@ const DashboardLayout: React.FC = () => {
                 className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium ${cfg.inactiveLink} ${cfg.inactiveHover} transition-colors`}
               >
                 <Home className="w-5 h-5 shrink-0" />
-                <span>Go to Store</span>
+                <span>Homepage</span>
               </Link>
+              <div className="relative" ref={mobileAccountRef}>
+                <button
+                  onClick={() => setMobileAccountOpen((prev) => !prev)}
+                  className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium ${cfg.inactiveLink} ${cfg.inactiveHover} transition-colors`}
+                  aria-expanded={mobileAccountOpen}
+                  aria-haspopup="menu"
+                >
+                  <Settings className="w-5 h-5 shrink-0" />
+                  <span>Account</span>
+                  <ChevronDown
+                    className={`w-4 h-4 ml-auto transition-transform ${mobileAccountOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {mobileAccountOpen && (
+                  <div className="mt-1 bg-white rounded-md shadow-lg py-2 border border-gray-100 overflow-hidden">
+                    {accountActions.map((action) => {
+                      if (action.to) {
+                        return (
+                          <Link
+                            key={action.label}
+                            to={action.to}
+                            onClick={() => {
+                              setMobileAccountOpen(false);
+                              setMobileOpen(false);
+                            }}
+                            className={
+                              action.danger
+                                ? ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS
+                                : ACCOUNT_DROPDOWN_ITEM_CLASS
+                            }
+                          >
+                            {action.label}
+                          </Link>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={action.label}
+                          onClick={() => {
+                            action.onClick?.();
+                            setMobileAccountOpen(false);
+                            setMobileOpen(false);
+                          }}
+                          className={`w-full text-left ${
+                            action.danger
+                              ? ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS
+                              : ACCOUNT_DROPDOWN_ITEM_CLASS
+                          }`}
+                        >
+                          {action.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleLogout}
                 className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium ${cfg.inactiveLink} ${cfg.logoutHover} transition-colors`}
@@ -383,28 +487,81 @@ const DashboardLayout: React.FC = () => {
             </ul>
           </nav>
 
-          {/* Go to Store + Logout */}
+          {/* Homepage + Logout */}
           <div className={`px-2 py-4 border-t ${cfg.divider} space-y-1`}>
+
+                        <div className="relative" ref={desktopAccountRef}>
+              <button
+                onClick={() => setDesktopAccountOpen((prev) => !prev)}
+                className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium ${cfg.inactiveLink} ${cfg.inactiveHover} transition-colors ${
+                  collapsed ? 'justify-center' : ''
+                }`}
+                title={collapsed ? 'Account' : undefined}
+                aria-expanded={desktopAccountOpen}
+                aria-haspopup="menu"
+              >
+                <Settings className="w-5 h-5 shrink-0" />
+                {!collapsed && <span>Account</span>}
+                {!collapsed && (
+                  <ChevronDown
+                    className={`w-4 h-4 ml-auto transition-transform ${desktopAccountOpen ? 'rotate-180' : ''}`}
+                  />
+                )}
+              </button>
+              {desktopAccountOpen && (
+                <div
+                  className={`absolute z-20 bottom-full mb-1 ${ACCOUNT_DROPDOWN_PANEL_CLASS} ${
+                    collapsed ? 'left-full ml-2 w-56' : 'left-0 w-full'
+                  }`}
+                >
+                  {accountActions.map((action) => {
+                    if (action.to) {
+                      return (
+                        <Link
+                          key={action.label}
+                          to={action.to}
+                          onClick={() => setDesktopAccountOpen(false)}
+                          className={
+                            action.danger
+                              ? ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS
+                              : ACCOUNT_DROPDOWN_ITEM_CLASS
+                          }
+                        >
+                          {action.label}
+                        </Link>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={action.label}
+                        onClick={() => {
+                          action.onClick?.();
+                          setDesktopAccountOpen(false);
+                        }}
+                        className={`w-full text-left ${
+                          action.danger
+                            ? ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS
+                            : ACCOUNT_DROPDOWN_ITEM_CLASS
+                        }`}
+                      >
+                        {action.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <Link
               to="/"
               className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium ${cfg.inactiveLink} ${cfg.inactiveHover} transition-colors ${
                 collapsed ? 'justify-center' : ''
               }`}
-              title={collapsed ? 'Go to Store' : undefined}
+              title={collapsed ? 'Homepage' : undefined}
             >
               <Home className="w-5 h-5 shrink-0" />
-              {!collapsed && <span>Go to Store</span>}
+              {!collapsed && <span>Homepage</span>}
             </Link>
-            <button
-              onClick={handleLogout}
-              className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium ${cfg.inactiveLink} ${cfg.logoutHover} transition-colors ${
-                collapsed ? 'justify-center' : ''
-              }`}
-              title={collapsed ? 'Logout' : undefined}
-            >
-              <LogOut className="w-5 h-5 shrink-0" />
-              {!collapsed && <span>Logout</span>}
-            </button>
           </div>
         </aside>
 
@@ -413,16 +570,9 @@ const DashboardLayout: React.FC = () => {
           {/* Desktop header (hidden on mobile) */}
           <header className="hidden md:flex bg-white border-b border-gray-200 px-6 py-3 items-center justify-between shrink-0">
             <p className="text-sm text-gray-500">
-              Welcome{portalType !== 'vendor' ? ' back' : ''},{' '}
+              Welcome{portalType !== 'seller' ? ' back' : ''},{' '}
               <span className="font-semibold text-gray-800">{displayName}</span>
             </p>
-            <Link
-              to="/"
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              <Home className="w-4 h-4" />
-              <span>Go to Store</span>
-            </Link>
           </header>
           <main className="flex-1 overflow-y-auto p-4 md:p-6">
             <Outlet />

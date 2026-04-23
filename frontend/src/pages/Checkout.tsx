@@ -7,7 +7,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useCartStore } from '@/stores/cartStore';
 import { formatCurrency } from '@/lib/utils';
 import api from '@/lib/api';
-import { initiateEsewaPayment, initiateKhaltiPayment } from '@/lib/paymentGateway';
 import { CheckCircle, Truck } from 'lucide-react';
 
 const checkoutSchema = z.object({
@@ -18,7 +17,7 @@ const checkoutSchema = z.object({
   state: z.string().min(2),
   zipCode: z.string().min(5),
   country: z.string().min(2),
-  paymentMethod: z.enum(['esewa', 'khalti', 'cash_on_delivery']),
+  paymentMethod: z.literal('cash_on_delivery'),
   notes: z.string().optional(),
 });
 
@@ -118,25 +117,8 @@ const Checkout: React.FC = () => {
       const response = await api.post('/api/payment/initiate', orderData);
       const { paymentData } = response.data.data;
       
-      // Handle payment based on method
-      if (data.paymentMethod === 'esewa') {
-        // Redirect to eSewa
-        await initiateEsewaPayment({
-          amount: paymentData.amount,
-          orderId: paymentData.orderId,
-          taxAmount: paymentData.taxAmount,
-          serviceCharge: 0,
-          deliveryCharge: paymentData.shippingCost
-        });
-      } else if (data.paymentMethod === 'khalti') {
-        // Redirect to Khalti
-        await initiateKhaltiPayment({
-          amount: paymentData.total,
-          orderId: paymentData.orderId,
-          orderName: `Order ${paymentData.orderNumber}`
-        });
-      } else {
-        // Cash on delivery - order already created, just redirect
+      // Cash on delivery only for now.
+      if (paymentData?.orderId) {
         clearCart();
         navigate('/user/dashboard');
       }
@@ -230,14 +212,7 @@ const Checkout: React.FC = () => {
                   <input {...register('paymentMethod')} type="radio" value="cash_on_delivery" className="mr-3" />
                   <span>Cash on Delivery</span>
                 </label>
-                <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                  <input {...register('paymentMethod')} type="radio" value="esewa" className="mr-3" />
-                  <span>eSewa</span>
-                </label>
-                <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                  <input {...register('paymentMethod')} type="radio" value="khalti" className="mr-3" />
-                  <span>Khalti</span>
-                </label>
+                <p className="text-xs text-gray-500">Online payment methods will be enabled later.</p>
               </div>
             </div>
 

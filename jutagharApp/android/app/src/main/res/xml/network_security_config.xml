@@ -2,7 +2,7 @@
 <network-security-config>
   <base-config cleartextTrafficPermitted="false" />
     <domain-config includeSubdomains="true">
-      <domain>dev.jutaghar.com</domain>
+      <domain>jutaghar.com</domain>
       <pin-set expiration="2035-12-31">
         <pin digest="SHA-256">I2cK5YdoqcjAnUGkCWhuGPLAVMfLLx7WUwxDX1KPr3w=</pin>
       </pin-set>

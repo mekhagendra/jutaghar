@@ -7,6 +7,11 @@ import { useWishlistStore } from '@/stores/wishlistStore';
 import api from '@/lib/api';
 import { useLocation } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
+import { getAccountActions } from '@/lib/accountActions';
+import {
+  ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS,
+  ACCOUNT_DROPDOWN_ITEM_CLASS,
+} from '@/lib/accountDropdownStyles';
 
 interface NavItem {
   label: string;
@@ -21,13 +26,6 @@ interface Category {
   productCount?: number;
 }
 
-interface AccountAction {
-  label: string;
-  to?: string;
-  onClick?: () => void;
-  danger?: boolean;
-}
-
 const Navbar: React.FC = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -39,6 +37,8 @@ const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { getTotalItems, addItem: addToCart } = useCartStore();
   const { items: wishlistItems, removeItem: removeFromWishlist, getTotalItems: getWishlistCount } = useWishlistStore();
+
+  const isStaffRole = isAuthenticated && (user?.role === 'admin' || user?.role === 'seller' || user?.role === 'manager');
 
   // Wishlist drawer state
   const [wishlistOpen, setWishlistOpen] = useState(false);
@@ -212,39 +212,16 @@ const Navbar: React.FC = () => {
     ];
   }, [allCategories, menCategories, womenCategories, kidsCategories]);
 
-  const accountActions: AccountAction[] = useMemo(() => {
-    if (!isAuthenticated || !user) {
-      return [{ label: 'Login', to: '/login' }];
-    }
-
-    const commonActions: AccountAction[] = [
-      { label: 'Account Info', to: '/user/profile' },
-      { label: 'Change Password', to: '/user/profile#change-password' },
-    ];
-
-    const roleActions: AccountAction[] = ['admin', 'manager'].includes(user.role)
-      ? [
-          { label: 'Admin Dashboard', to: '/admin/dashboard' },
-          { label: 'Manage Users', to: '/admin/users' },
-        ]
-      : user.role === 'outlet'
-      ? [
-          { label: 'Vendor Dashboard', to: '/vendor/dashboard' },
-          { label: 'Manage Products', to: '/products/manage' },
-          { label: 'Vendor Orders', to: '/vendor/orders' },
-        ]
-      : [
-          { label: 'My Dashboard', to: '/user/dashboard' },
-          { label: 'My Orders', to: '/user/orders' },
-          { label: 'Wishlist', to: '/user/wishlist' },
-        ];
-
-    return [
-      ...commonActions,
-      ...roleActions,
-      { label: 'Logout', onClick: logout, danger: true },
-    ];
-  }, [isAuthenticated, logout, user]);
+  const accountActions = useMemo(
+    () =>
+      getAccountActions({
+        isAuthenticated,
+        user,
+        logout,
+        isHomePage: location.pathname === '/',
+      }),
+    [isAuthenticated, location.pathname, logout, user]
+  );
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
@@ -295,29 +272,33 @@ const Navbar: React.FC = () => {
 
           {/* Right Actions */}
           <div className="flex items-center gap-4">
-            {/* Cart */}
-            <Link to="/cart" className="relative hover:text-primary-600 transition-colors">
-              <ShoppingCart className="w-6 h-6" />
-              {getTotalItems() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {getTotalItems()}
-                </span>
-              )}
-            </Link>
+            {/* Cart — hidden for staff roles */}
+            {!isStaffRole && (
+              <Link to="/cart" className="relative hover:text-primary-600 transition-colors">
+                <ShoppingCart className="w-6 h-6" />
+                {getTotalItems() > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {getTotalItems()}
+                  </span>
+                )}
+              </Link>
+            )}
 
-            {/* Wishlist */}
-            <button
-              onClick={() => setWishlistOpen(true)}
-              className="relative hover:text-primary-600 transition-colors"
-              aria-label="Wishlist"
-            >
-              <Heart className="w-6 h-6" />
-              {getWishlistCount() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {getWishlistCount()}
-                </span>
-              )}
-            </button>
+            {/* Wishlist — hidden for staff roles */}
+            {!isStaffRole && (
+              <button
+                onClick={() => setWishlistOpen(true)}
+                className="relative hover:text-primary-600 transition-colors"
+                aria-label="Wishlist"
+              >
+                <Heart className="w-6 h-6" />
+                {getWishlistCount() > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {getWishlistCount()}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* User Menu */}
             {isAuthenticated ? (
@@ -355,7 +336,11 @@ const Navbar: React.FC = () => {
                             action.onClick?.();
                             setAccountMenuOpen(false);
                           }}
-                          className={`block w-full text-left px-4 py-2 text-sm transition-colors ${action.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-primary-50 hover:text-primary-600'}`}
+                          className={`w-full text-left ${
+                            action.danger
+                              ? ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS
+                              : ACCOUNT_DROPDOWN_ITEM_CLASS
+                          }`}
                         >
                           {action.label}
                         </button>

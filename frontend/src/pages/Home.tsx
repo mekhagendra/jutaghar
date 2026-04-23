@@ -20,8 +20,6 @@ const Home: React.FC = () => {
 
       <Featured />
 
-      <NewArrival />
-
       <Brands />
 
       <Sale />
@@ -34,6 +32,8 @@ const Home: React.FC = () => {
 
       <Category />
 
+      <NewArrival />
+      
       <Why />
     </div>
   );

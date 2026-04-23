@@ -1,5 +1,5 @@
 // User types
-export type UserRole = 'admin' | 'manager' | 'outlet' | 'user';
+export type UserRole = 'admin' | 'manager' | 'seller' | 'customer';
 export type UserStatus = 'pending' | 'active' | 'suspended';
 
 export interface Affiliation {
@@ -185,7 +185,7 @@ export interface RegisterRequest {
   password: string;
   fullName: string;
   phone: string;
-  role?: 'vendor' | 'user';
+  role?: 'seller' | 'customer';
   businessName?: string;
   businessLicense?: string;
   businessAddress?: string;

@@ -22,7 +22,7 @@ ${domainEntries}
 module.exports = function withAndroidNetworkSecurityConfig(config, props = {}) {
   const domains = Array.isArray(props.domains) && props.domains.length
     ? props.domains
-    : ['api.jutaghar.com', 'dev.jutaghar.com'];
+    : ['jutaghar.com'];
 
   const pins = Array.isArray(props.spkiPins) && props.spkiPins.length
     ? props.spkiPins

@@ -10,7 +10,7 @@ const initiateOrderValidation = [
   body('items').isArray({ min: 1 }),
   body('items.*.product').notEmpty(),
   body('items.*.quantity').isInt({ min: 1 }),
-  body('paymentMethod').isIn(['esewa', 'khalti', 'cash_on_delivery']),
+  body('paymentMethod').isIn(['cash_on_delivery']),
   body('shippingAddress').notEmpty()
 ];
 

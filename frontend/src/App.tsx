@@ -35,6 +35,9 @@ const OrderDetail = lazy(() => import('@/pages/user/OrderDetail'));
 const UserOrders = lazy(() => import('@/pages/user/Orders'));
 const UserWishlist = lazy(() => import('@/pages/user/Wishlist'));
 const UserProfile = lazy(() => import('@/pages/user/Profile'));
+const AccountInfo = lazy(() => import('@/pages/user/AccountInfo'));
+const UpdateProfile = lazy(() => import('@/pages/user/UpdateProfile'));
+const UpdatePassword = lazy(() => import('@/pages/user/UpdatePassword'));
 const MfaSetup = lazy(() => import('@/pages/user/MfaSetup'));
 
 // Admin pages
@@ -180,7 +183,7 @@ function App() {
           {/* Vendor routes */}
           <Route
             element={
-              <ProtectedRoute allowedRoles={['outlet', 'admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['seller', 'admin', 'manager']}>
                 <DashboardLayout />
               </ProtectedRoute>
             }
@@ -206,7 +209,10 @@ function App() {
             <Route path="/user/dashboard" element={<UserDashboard />} />
             <Route path="/user/orders" element={<UserOrders />} />
             <Route path="/user/wishlist" element={<UserWishlist />} />
+            <Route path="/user/account" element={<AccountInfo />} />
             <Route path="/user/profile" element={<UserProfile />} />
+            <Route path="/user/profile/update" element={<UpdateProfile />} />
+            <Route path="/user/profile/change-password" element={<UpdatePassword />} />
             <Route path="/user/mfa" element={<MfaSetup />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
           </Route>

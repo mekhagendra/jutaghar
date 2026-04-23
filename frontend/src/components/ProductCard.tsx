@@ -5,6 +5,7 @@ import { Product } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/stores/cartStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
+import { useAuthStore } from '@/stores/authStore';
 
 interface ProductCardProps {
   product: Product;
@@ -14,6 +15,8 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
   const { addItem } = useCartStore();
   const { toggleItem, isInWishlist } = useWishlistStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const isStaffRole = isAuthenticated && (user?.role === 'admin' || user?.role === 'seller' || user?.role === 'manager');
   const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
@@ -108,37 +111,39 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
           )}
         </div>
 
-        {/* Quick Actions */}
-        <div
-          className={`absolute top-2 right-2 flex flex-col gap-2 transition-all duration-300 ${
-            isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
-          }`}
-        >
-          <button
-            className="p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition"
-            aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggleItem(product);
-            }}
+        {/* Quick Actions — hidden for staff roles */}
+        {!isStaffRole && (
+          <div
+            className={`absolute top-2 right-2 flex flex-col gap-2 transition-all duration-300 ${
+              isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
+            }`}
           >
-            <Heart
-              className={`w-4 h-4 transition-colors ${
-                wishlisted ? 'fill-red-500 text-red-500' : 'text-gray-700 hover:text-red-500'
-              }`}
-            />
-          </button>
-          {!isOutOfStock && (
             <button
-              className="p-2 bg-white rounded-full shadow-md hover:bg-primary-50 transition"
-              aria-label="Add to cart"
-              onClick={handleAddToCart}
+              className="p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition"
+              aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleItem(product);
+              }}
             >
-              <ShoppingCart className="w-4 h-4 text-gray-700 hover:text-primary-600" />
+              <Heart
+                className={`w-4 h-4 transition-colors ${
+                  wishlisted ? 'fill-red-500 text-red-500' : 'text-gray-700 hover:text-red-500'
+                }`}
+              />
             </button>
-          )}
-        </div>
+            {!isOutOfStock && (
+              <button
+                className="p-2 bg-white rounded-full shadow-md hover:bg-primary-50 transition"
+                aria-label="Add to cart"
+                onClick={handleAddToCart}
+              >
+                <ShoppingCart className="w-4 h-4 text-gray-700 hover:text-primary-600" />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Out of Stock Overlay */}
         {isOutOfStock && (

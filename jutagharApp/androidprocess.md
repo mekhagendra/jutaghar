@@ -18,7 +18,7 @@ Configured app IDs:
 - `android.usesCleartextTraffic` is explicitly set to `false` in `app.json`.
 - Expo defaults are restrictive on modern SDKs, but this project keeps the setting explicit for auditability.
 - Android production domains are pinned via a Network Security Config plugin (`plugins/withAndroidNetworkSecurityConfig.js`) using SPKI SHA-256 pins.
-- iOS ATS is explicitly configured with pinned domains for `api.jutaghar.com` and `dev.jutaghar.com`.
+- iOS ATS is explicitly configured with a pinned domain for `jutaghar.com`.
 
 ---
 

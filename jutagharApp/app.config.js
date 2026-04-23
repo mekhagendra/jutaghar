@@ -1,5 +1,5 @@
-const domain = process.env.EXPO_PUBLIC_DOMAIN || 'dev.jutaghar.com';
 const spkiPin = process.env.SPKI_PIN || '';
+const domain = process.env.EXPO_PUBLIC_DOMAIN || 'jutaghar.com';
 
 // Derive the Google Sign-In iOS URL scheme from the full client ID.
 // e.g. "624...mu.apps.googleusercontent.com" → "com.googleusercontent.apps.624...mu"

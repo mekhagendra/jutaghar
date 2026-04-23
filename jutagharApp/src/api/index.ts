@@ -4,7 +4,7 @@ import { fetch as sslPinnedFetch, type ReactNativeSSLPinning } from 'react-nativ
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/shared/secureStorage';
 import { getDeviceAttestationToken } from '@/security/deviceAttestation';
 
-const PROD_API_BASE_URL = 'https://dev.jutaghar.com';
+const PROD_API_BASE_URL = 'https://jutaghar.com';
 
 function normalizeBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/, '');

@@ -29,7 +29,7 @@ interface User {
 
 const ManageUsers: React.FC = () => {
   const queryClient = useQueryClient();
-  const [filterRole, setFilterRole] = React.useState<'all' | 'user' | 'outlet' | 'manager' | 'admin'>('all');
+  const [filterRole, setFilterRole] = React.useState<'all' | 'customer' | 'seller' | 'manager' | 'admin'>('all');
   const [filterStatus, setFilterStatus] = React.useState<'all' | 'active' | 'pending' | 'suspended'>('all');
   const [searchTerm, setSearchTerm] = React.useState('');
 
@@ -112,8 +112,8 @@ const ManageUsers: React.FC = () => {
     const badges = {
       admin: 'bg-purple-100 text-purple-800',
       manager: 'bg-blue-100 text-blue-800',
-      outlet: 'bg-pink-100 text-pink-800',
-      user: 'bg-gray-100 text-gray-800',
+      seller: 'bg-pink-100 text-pink-800',
+      customer: 'bg-gray-100 text-gray-800',
     };
     return badges[role as keyof typeof badges] || 'bg-gray-100 text-gray-800';
   };
@@ -145,24 +145,24 @@ const ManageUsers: React.FC = () => {
                 All
               </button>
               <button
-                onClick={() => setFilterRole('user')}
+                onClick={() => setFilterRole('customer')}
                 className={`px-4 py-2 rounded-lg font-medium transition ${
-                  filterRole === 'user'
+                  filterRole === 'customer'
                     ? 'bg-primary-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Users
+                Customers
               </button>
               <button
-                onClick={() => setFilterRole('outlet')}
+                onClick={() => setFilterRole('seller')}
                 className={`px-4 py-2 rounded-lg font-medium transition ${
-                  filterRole === 'outlet'
+                  filterRole === 'seller'
                     ? 'bg-primary-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Outlets
+                Sellers
               </button>
               <button
                 onClick={() => setFilterRole('manager')}
@@ -385,8 +385,8 @@ const ManageUsers: React.FC = () => {
                         className={`px-3 py-1 text-xs font-medium rounded-full ${getRoleBadge(user.role)}`}
                         disabled={updateRoleMutation.isPending}
                       >
-                        <option value="user">User</option>
-                        <option value="outlet">Outlet</option>
+                        <option value="customer">Customer</option>
+                        <option value="seller">Seller</option>
                         <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
                       </select>

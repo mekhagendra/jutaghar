@@ -100,7 +100,7 @@ const UserProfile: React.FC = () => {
     vendorRequestMutation.mutate(vendorForm);
   };
 
-  const isRegularUser = user?.role === 'user';
+  const isRegularUser = user?.role === 'customer';
   const vendorRequestStatus = user?.vendorRequest?.status || 'none';
 
   const handleProfileSubmit = (e: React.FormEvent) => {

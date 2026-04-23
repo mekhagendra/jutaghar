@@ -22,15 +22,15 @@ describe('adminController audit writes', () => {
   it('writes audit log when user role is updated', async () => {
     const userId = '507f1f77bcf86cd799439012';
     User.findById.mockReturnValue({
-      select: jest.fn().mockResolvedValue({ role: 'user' }),
+      select: jest.fn().mockResolvedValue({ role: 'customer' }),
     });
     User.findByIdAndUpdate.mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: userId, role: 'outlet' }),
+      select: jest.fn().mockResolvedValue({ _id: userId, role: 'seller' }),
     });
 
     const req = {
       params: { id: userId },
-      body: { role: 'outlet' },
+      body: { role: 'seller' },
       user: { _id: '507f1f77bcf86cd799439099' },
       headers: { 'user-agent': 'jest' },
       ip: '127.0.0.1',
