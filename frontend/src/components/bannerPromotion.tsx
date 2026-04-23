@@ -4,7 +4,7 @@ import { Store, Package } from 'lucide-react';
 
 const BannerPromotion: React.FC = () => {
   return (
-    <section className="bg-gradient-to-r from-primary-600 to-primary-800 text-white py-12">
+    <section className="bg-gradient-to-r from-amber-600 to-amber-900 text-white py-12">
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex-1 text-center md:text-left">

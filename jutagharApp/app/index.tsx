@@ -1,24 +1,32 @@
+import { logout as authLogout, loadAuthState, subscribe } from '@/features/auth';
+import { loadWishlist } from '@/features/catalog';
+import { loadCart } from '@/features/checkout';
+import {
+    AboutUsScreen,
+    CartScreen,
+    CheckoutScreen,
+    ContactScreen,
+    HomeScreen,
+    LoginScreen,
+    OrderDetailScreen,
+    OrdersScreen,
+    ProductDetailScreen,
+    ProductsScreen,
+    ProfileScreen,
+    SellerAddProductScreen,
+    SellerEditProductScreen,
+    SellerHomeScreen,
+    SellerOrdersScreen,
+    SellerProductsScreen,
+    UserRegistrationScreen,
+    WishlistScreen
+} from '@/screens';
+import Footer, { type TabName } from '@/shared/components/Footer';
+import { setHomeNavigationListener } from '@/shared/navigation/homeNavigation';
+import SellerFooter, { type SellerTabName } from '@/shared/components/SellerFooter';
+import type { Product } from '@/types';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import Footer, { type TabName } from '../components/Footer';
-import { logout as authLogout, loadAuthState, subscribe } from '../lib/authStore';
-import { loadCart } from '../lib/cartStore';
-import type { Product } from '../lib/types';
-import { loadWishlist } from '../lib/wishlistStore';
-import AboutUsScreen from './about';
-import CartScreen from './cart';
-import CheckoutScreen from './checkout';
-import ContactScreen from './contact';
-import HomeScreen from './home';
-import LoginScreen from './login';
-import OrderDetailScreen from './order-detail';
-import OrdersScreen from './orders';
-import ProductDetailScreen from './product-detail';
-import ProductsScreen from './products';
-import ProfileScreen from './profile';
-import SellerHomeScreen from './seller-home';
-import UserRegistrationScreen from './user-registration';
-import WishlistScreen from './wishlist';
+import { ActivityIndicator, Alert, View } from 'react-native';
 
 type ViewType = 'login' | 'register';
 type Screen =
@@ -33,7 +41,12 @@ type Screen =
   | 'profile'
   | 'wishlist'
   | 'about'
-  | 'contact';
+  | 'contact'
+  | 'seller-products'
+  | 'seller-add-product'
+  | 'seller-edit-product'
+  | 'seller-orders'
+  | 'seller-account';
 
 export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -49,11 +62,14 @@ export default function Index() {
   const [selectedSort, setSelectedSort] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
+  const [profileResetToken, setProfileResetToken] = useState(0);
 
   const navigateTo = (screen: Screen) => {
     setScreenHistory(prev => [...prev, currentScreen]);
     setCurrentScreen(screen);
   };
+
+  const isSeller = userData?.role === 'seller';
 
   const goBack = () => {
     if (screenHistory.length > 0) {
@@ -63,7 +79,7 @@ export default function Index() {
       setSelectedProduct(null);
       setSelectedOrderId(null);
     } else {
-      setCurrentScreen(userData?.userType === 'seller' ? 'seller-home' : 'home');
+      setCurrentScreen(isSeller ? 'seller-home' : 'home');
       setSelectedProduct(null);
       setSelectedOrderId(null);
     }
@@ -73,16 +89,14 @@ export default function Index() {
   useEffect(() => {
     const init = async () => {
       const state = await loadAuthState();
-      await loadCart();
-      await loadWishlist();
       if (state.isAuthenticated && state.user) {
-        setUserData({
-          ...state.user,
-          userType: state.user.role === 'outlet' ? 'seller' : 'user',
-        });
+        setUserData(state.user);
         setIsLoggedIn(true);
       }
       setIsLoading(false);
+
+      // Restore persisted cart/wishlist without blocking first paint.
+      void Promise.allSettled([loadCart(), loadWishlist()]);
     };
     init();
   }, []);
@@ -98,12 +112,28 @@ export default function Index() {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    setHomeNavigationListener(() => {
+      setShowLogin(false);
+      setCurrentScreen(isLoggedIn && isSeller ? 'seller-home' : 'home');
+      setScreenHistory([]);
+      setSelectedProduct(null);
+      setSelectedOrderId(null);
+      setSelectedCategory(null);
+      setSelectedGender(null);
+      setSelectedSort(null);
+      setSelectedBrand(null);
+    });
+
+    return () => setHomeNavigationListener(null);
+  }, [isLoggedIn, isSeller]);
+
   // Handle login success
   const handleLogin = (data: any) => {
     setUserData(data);
     setIsLoggedIn(true);
     setShowLogin(false);
-    setCurrentScreen(data.userType === 'seller' ? 'seller-home' : 'home');
+    setCurrentScreen(data?.role === 'seller' ? 'seller-home' : 'home');
     setScreenHistory([]);
   };
 
@@ -159,12 +189,30 @@ export default function Index() {
     navigateTo('checkout');
   };
 
+  const handleSellerTabPress = (tab: SellerTabName) => {
+    if (tab === 'seller-account' && currentScreen === 'seller-account') {
+      setProfileResetToken(prev => prev + 1);
+      return;
+    }
+
+    setShowLogin(false);
+    setCurrentScreen(tab as Screen);
+    setScreenHistory([]);
+    setSelectedProduct(null);
+    setSelectedOrderId(null);
+  };
+
   // Footer tab navigation
   const handleTabPress = (tab: TabName) => {
     if (tab === 'profile' && !isLoggedIn) {
       setShowLogin(true);
       return;
     }
+    if (tab === 'profile' && currentScreen === 'profile') {
+      setProfileResetToken(prev => prev + 1);
+      return;
+    }
+    setShowLogin(false);
     setCurrentScreen(tab as Screen);
     setScreenHistory([]);
     setSelectedProduct(null);
@@ -176,6 +224,8 @@ export default function Index() {
   };
 
   const getActiveTab = (): TabName => {
+    if (showLogin) return 'profile';
+
     switch (currentScreen) {
       case 'products': return 'products';
       case 'cart': return 'cart';
@@ -194,42 +244,84 @@ export default function Index() {
     );
   }
 
-  // Login/Register screens (no footer)
-  if (showLogin) {
-    if (viewType === 'register') {
+  // Detail/transactional screens (with footer)
+  const renderScreenContent = () => {
+    if (showLogin) {
+      if (viewType === 'register') {
+        return (
+          <UserRegistrationScreen
+            onRegister={handleRegistration}
+            onBackToLogin={() => setViewType('login')}
+          />
+        );
+      }
       return (
-        <UserRegistrationScreen
-          onRegister={handleRegistration}
-          onBackToLogin={() => setViewType('login')}
-          showBackButton={true}
-          onBack={() => setShowLogin(false)}
+        <LoginScreen
+          onLogin={handleLogin}
+          onGoToRegister={() => setViewType('register')}
         />
       );
     }
-    return (
-      <LoginScreen
-        onLogin={handleLogin}
-        showBackButton={true}
-        onBack={() => setShowLogin(false)}
-        onBackToHome={() => setShowLogin(false)}
-        onGoToRegister={() => setViewType('register')}
-      />
-    );
-  }
 
-  // Seller Home (no footer - sellers have their own dashboard)
-  if (isLoggedIn && (currentScreen === 'seller-home' || userData?.userType === 'seller')) {
-    return (
-      <SellerHomeScreen
-        onLogout={handleLogout}
-        onGoToLogin={() => setShowLogin(true)}
-        userData={userData}
-      />
-    );
-  }
+    if (isLoggedIn && currentScreen === 'seller-home') {
+      return (
+        <SellerHomeScreen
+          onAddProduct={() => navigateTo('seller-add-product')}
+          onManageProducts={() => navigateTo('seller-products')}
+          onViewOrders={() => navigateTo('seller-orders')}
+          userData={userData}
+        />
+      );
+    }
 
-  // Detail/transactional screens (with footer)
-  const renderScreenContent = () => {
+    if (isLoggedIn && isSeller && currentScreen === 'seller-products') {
+      return (
+        <SellerProductsScreen
+          onAddProduct={() => navigateTo('seller-add-product')}
+          onEditProduct={(product) => {
+            setSelectedProduct(product);
+            navigateTo('seller-edit-product');
+          }}
+        />
+      );
+    }
+
+    if (isLoggedIn && isSeller && currentScreen === 'seller-add-product') {
+      return <SellerAddProductScreen onDone={() => setCurrentScreen('seller-products')} />;
+    }
+
+    if (
+      isLoggedIn &&
+      isSeller &&
+      currentScreen === 'seller-edit-product' &&
+      selectedProduct
+    ) {
+      return (
+        <SellerEditProductScreen
+          product={selectedProduct}
+          onDone={() => {
+            setSelectedProduct(null);
+            setCurrentScreen('seller-products');
+          }}
+        />
+      );
+    }
+
+    if (isLoggedIn && isSeller && currentScreen === 'seller-orders') {
+      return <SellerOrdersScreen />;
+    }
+
+    if (isLoggedIn && isSeller && currentScreen === 'seller-account') {
+      return (
+        <ProfileScreen
+          resetToken={profileResetToken}
+          userData={userData}
+          onLogout={handleLogout}
+          onViewOrders={handleViewOrders}
+        />
+      );
+    }
+
     if (currentScreen === 'product-detail' && selectedProduct) {
       return (
         <ProductDetailScreen
@@ -290,18 +382,23 @@ export default function Index() {
       case 'cart':
         return (
           <CartScreen
+            onBack={goBack}
             onCheckout={handleViewCheckout}
+            onBrowseProducts={() => handleViewProducts()}
           />
         );
       case 'wishlist':
         return (
           <WishlistScreen
+            onBack={goBack}
             onViewProduct={handleViewProduct}
+            onBrowseProducts={() => handleViewProducts()}
           />
         );
       case 'profile':
         return (
           <ProfileScreen
+            resetToken={profileResetToken}
             userData={userData}
             onLogout={handleLogout}
             onViewOrders={handleViewOrders}
@@ -320,11 +417,26 @@ export default function Index() {
   return (
     <View style={{ flex: 1 }}>
       {renderScreenContent()}
-      <Footer
-        activeTab={getActiveTab()}
-        onNavigate={handleTabPress}
-        isLoggedIn={isLoggedIn}
-      />
+      {isLoggedIn && isSeller ? (
+        <SellerFooter
+          activeTab={
+            currentScreen === 'seller-products' ||
+            currentScreen === 'seller-add-product' ||
+            currentScreen === 'seller-edit-product' ||
+            currentScreen === 'seller-orders' ||
+            currentScreen === 'seller-account'
+              ? (currentScreen as SellerTabName)
+              : 'seller-home'
+          }
+          onNavigate={handleSellerTabPress}
+        />
+      ) : (
+        <Footer
+          activeTab={getActiveTab()}
+          onNavigate={handleTabPress}
+          isLoggedIn={isLoggedIn}
+        />
+      )}
     </View>
   );
 }

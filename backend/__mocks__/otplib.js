@@ -1,8 +1,18 @@
 // Jest mock for otplib
-const authenticator = {
-  generateSecret: () => 'JBSWY3DPEHPK3PXP',
-  keyuri: (email, app, secret) => `otpauth://totp/${app}:${email}?secret=${secret}&issuer=${app}`,
-  check: () => true,
-};
+class OTP {
+  constructor() {}
 
-module.exports = { authenticator };
+  generateSecret() {
+    return 'JBSWY3DPEHPK3PXP';
+  }
+
+  generateURI({ issuer, label, secret }) {
+    return `otpauth://totp/${issuer}:${label}?secret=${secret}&issuer=${issuer}`;
+  }
+
+  verifySync() {
+    return true;
+  }
+}
+
+module.exports = { OTP };

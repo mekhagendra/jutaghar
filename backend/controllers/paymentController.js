@@ -9,15 +9,16 @@ import logger from '../utils/logger.js';
 import { writeAudit } from '../utils/audit.js';
 import { generateOrderNumber } from '../utils/orderNumber.js';
 
-// eSewa configuration — fail fast if secrets are absent
-if (!process.env.ESEWA_SECRET_KEY) {
-  throw new Error('ESEWA_SECRET_KEY environment variable is required but not set');
-}
-if (!process.env.ESEWA_MERCHANT_CODE) {
-  throw new Error('ESEWA_MERCHANT_CODE environment variable is required but not set');
-}
-const getEsewaSecretKey = () => process.env.ESEWA_SECRET_KEY;
-const getEsewaMerchantCode = () => process.env.ESEWA_MERCHANT_CODE;
+const getRequiredEnv = (name) => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} environment variable is required but not set`);
+  }
+  return value;
+};
+
+const getEsewaSecretKey = () => getRequiredEnv('ESEWA_SECRET_KEY');
+const getEsewaMerchantCode = () => getRequiredEnv('ESEWA_MERCHANT_CODE');
 const getKhaltiWebhookSecret = () => process.env.KHALTI_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET || '';
 const ESEWA_STATUS_CHECK_URL = process.env.ESEWA_STATUS_CHECK_URL || 'https://rc.esewa.com.np/api/epay/transaction/status/';
 

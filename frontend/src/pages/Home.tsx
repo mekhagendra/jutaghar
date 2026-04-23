@@ -9,13 +9,14 @@ import BestSeller from '@/components/bestSeller';
 import Category from '@/components/category';
 import BannerPremium from '@/components/bannerPremium';
 import BannerSports from '@/components/bannerSports';
+import BannerPromotion from '@/components/bannerPromotion';
 
 const Home: React.FC = () => {
   return (
     <div className="min-h-screen">
       <Hero />
 
-      {/* <BannerPromotion /> */}
+      <BannerPromotion />
 
       <Featured />
 

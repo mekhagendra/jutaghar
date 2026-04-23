@@ -55,8 +55,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'manager', 'outlet', 'user'],
-    default: 'user'
+    enum: ['admin', 'manager', 'seller', 'customer'],
+    default: 'customer'
   },
   status: {
     type: String,
@@ -129,6 +129,16 @@ const userSchema = new mongoose.Schema({
 // Note: email already has unique index from schema definition
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ affiliatedBy: 1 });
+
+// Backwards compatibility: silently normalize legacy role values loaded from DB
+// so the rest of the codebase only deals with 'customer' / 'seller'.
+function normalizeLegacyRole(doc) {
+  if (!doc) return;
+  if (doc.role === 'user') doc.role = 'customer';
+  else if (doc.role === 'outlet') doc.role = 'seller';
+}
+userSchema.post('init', function () { normalizeLegacyRole(this); });
+userSchema.pre('save', function (next) { normalizeLegacyRole(this); next(); });
 
 const User = mongoose.model('User', userSchema);
 
