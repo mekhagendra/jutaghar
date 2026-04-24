@@ -1,18 +1,18 @@
+import api from '@/api';
+import type { Order } from '@/types';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import api from '@/api';
-import type { Order } from '@/types';
 
 const STATUS_OPTIONS = ['all', 'pending', 'processing', 'shipped', 'delivered', 'returned', 'cancelled'] as const;
 const ACTIVE_VENDOR_STAGES = ['pending', 'processing', 'shipped', 'delivered', 'returned'] as const;
@@ -165,8 +165,8 @@ export default function SellerOrdersScreen() {
         {!!customerEmail && <Text style={styles.meta}>{customerEmail}</Text>}
 
         <View style={styles.itemsWrap}>
-          {item.items.slice(0, 2).map((line) => (
-            <Text key={line._id} style={styles.itemLine} numberOfLines={1}>
+          {item.items.slice(0, 2).map((line, index) => (
+            <Text key={line._id ? `${line._id}-${index}` : `${item._id}-line-${index}`} style={styles.itemLine} numberOfLines={1}>
               {line.product?.name || 'Product'} x {line.quantity}
             </Text>
           ))}

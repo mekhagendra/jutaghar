@@ -1,3 +1,7 @@
+import api from '@/api';
+import { getAuthState } from '@/features/auth';
+import { clearCart, getCartItems, getTotalPrice } from '@/features/checkout';
+import type { CartItem, DeliverySettings } from '@/types';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
@@ -12,10 +16,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import api from '@/api';
-import { getAuthState } from '@/features/auth';
-import { clearCart, getCartItems, getTotalPrice } from '@/features/checkout';
-import type { CartItem, DeliverySettings } from '@/types';
 
 interface CheckoutScreenProps {
   onBack: () => void;
@@ -97,6 +97,8 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
     { value: 'esewa', label: 'eSewa', icon: '📱' },
     { value: 'khalti', label: 'Khalti', icon: '📲' },
   ];
+  const enabledPaymentMethods = ['cash_on_delivery'];
+  const visiblePaymentOptions = paymentOptions.filter((opt) => enabledPaymentMethods.includes(opt.value));
 
   const handleEsewaPayment = async (paymentData: { orderId: string; amount: number; taxAmount: number; shippingCost: number; total: number }, orderId: string) => {
     try {
@@ -349,7 +351,7 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
         {/* Payment Method */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💳 Payment Method</Text>
-          {paymentOptions.map((opt) => (
+          {visiblePaymentOptions.map((opt) => (
             <TouchableOpacity
               key={opt.value}
               style={[styles.paymentOption, paymentMethod === opt.value && styles.paymentOptionActive]}

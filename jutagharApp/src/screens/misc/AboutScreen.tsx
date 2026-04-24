@@ -1,7 +1,7 @@
+import Header from '@/shared/components/Header';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import Header from '@/shared/components/Header';
 
 interface AboutUsScreenProps {
   onBack: () => void;
@@ -60,7 +60,7 @@ export default function AboutUsScreen({ onBack }: AboutUsScreenProps) {
             { icon: '✅', title: '100% Authentic Products', desc: 'Every product is verified for authenticity directly from brands and authorized sellers.' },
             { icon: '🚚', title: 'Fast & Free Delivery', desc: 'Free delivery on orders above Rs. 5,000 across Nepal with express options available.' },
             { icon: '↩️', title: 'Easy Returns', desc: '7-day hassle-free return and exchange policy for your peace of mind.' },
-            { icon: '💳', title: 'Secure Payment', desc: 'Multiple secure payment options including eSewa, Khalti, and Cash on Delivery.' },
+            { icon: '💳', title: 'Secure Payment', desc: 'Secure checkout with currently available payment methods including Cash on Delivery.' },
             { icon: '🏪', title: 'Multi-Vendor Marketplace', desc: 'Shop from multiple verified outlets and compare prices all in one place.' },
           ].map((item, index) => (
             <View key={index} style={styles.featureItem}>
