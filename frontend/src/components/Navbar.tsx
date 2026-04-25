@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { useLocation } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
 import { getAccountActions } from '@/lib/accountActions';
+import logo from '@/assets/logo.png';
 import {
   ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS,
   ACCOUNT_DROPDOWN_ITEM_CLASS,
@@ -228,6 +229,15 @@ const Navbar: React.FC = () => {
       {/* Main Navbar */}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14">
+          {/* Mobile Logo */}
+          <Link to="/" onClick={() => window.scrollTo(0, 0)} className="lg:hidden flex-shrink-0">
+            <img
+              src={logo}
+              alt="JutaGhar"
+              className="h-8 w-auto object-contain hover:opacity-90 transition-opacity"
+            />
+          </Link>
+
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-1">
             {navItems.map((item) => (

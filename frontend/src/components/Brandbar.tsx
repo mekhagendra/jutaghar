@@ -19,7 +19,7 @@ const Brandbar: React.FC = () => {
     <div className="bg-white border-b border-gray-100">
       <div className="container mx-auto px-4 py-3 flex items-center gap-3 sm:gap-6">
         {/* Logo */}
-        <Link to="/" onClick={() => window.scrollTo(0, 0)} className="flex-shrink-0">
+        <Link to="/" onClick={() => window.scrollTo(0, 0)} className="hidden lg:flex flex-shrink-0">
           <img
             src={logo}
             alt="JutaGhar"
@@ -28,7 +28,7 @@ const Brandbar: React.FC = () => {
         </Link>
 
         {/* Search bar */}
-        <form onSubmit={handleSearch} className="flex-1 min-w-0 max-w-[572px]">
+        <form onSubmit={handleSearch} className="flex-1 min-w-0 max-w-[900px]">
           <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all">
             <input
               type="text"
