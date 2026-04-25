@@ -1,8 +1,7 @@
+import { getDeviceAttestationToken } from '@/security/deviceAttestation';
+import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/shared/secureStorage';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { fetch as sslPinnedFetch, type ReactNativeSSLPinning } from 'react-native-ssl-pinning';
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/shared/secureStorage';
-import { getDeviceAttestationToken } from '@/security/deviceAttestation';
 
 const PROD_API_BASE_URL = 'https://jutaghar.com';
 
@@ -58,7 +57,6 @@ interface HttpResult {
 class ApiClient {
   private baseURL: string;
   private readonly fallbackBaseURL: string | null;
-  private readonly productionPinnedCerts: string[];
 
   private readonly authBypassRefreshEndpoints = new Set([
     '/api/auth/login',
@@ -66,6 +64,7 @@ class ApiClient {
     '/api/auth/register/request-otp',
     '/api/auth/register/verify-otp',
     '/api/auth/google',
+    '/api/auth/apple',
     '/api/auth/forgot-password/request-otp',
     '/api/auth/forgot-password/verify-otp',
     '/api/auth/refresh',
@@ -74,10 +73,6 @@ class ApiClient {
   constructor(baseURL: string) {
     this.baseURL = baseURL;
     this.fallbackBaseURL = __DEV__ && baseURL !== PROD_API_BASE_URL ? PROD_API_BASE_URL : null;
-
-    const certs = (Constants.expoConfig?.extra as { sslPinning?: { certs?: string[] } } | undefined)
-      ?.sslPinning?.certs;
-    this.productionPinnedCerts = Array.isArray(certs) && certs.length > 0 ? certs : ['jutaghar_prod'];
   }
 
   private isProductionBuild(): boolean {
@@ -112,42 +107,13 @@ class ApiClient {
   }
 
   private async executeRequest(url: string, config: RequestInit): Promise<HttpResult> {
-    if (!this.isProductionBuild()) {
-      const response = await fetch(url, config);
-      return {
-        status: response.status,
-        ok: response.ok,
-        json: async () => {
-          try {
-            return await response.json();
-          } catch {
-            return null;
-          }
-        },
-      };
-    }
-
-    const sslOptions: ReactNativeSSLPinning.Options = {
-      method: (config.method as ReactNativeSSLPinning.Options['method']) || 'GET',
-      headers: (config.headers as ReactNativeSSLPinning.Header) || {},
-      body: typeof config.body === 'string' ? config.body : undefined,
-      timeoutInterval: 15000,
-      pkPinning: true,
-      sslPinning: {
-        certs: this.productionPinnedCerts,
-      },
-    };
-
-    const response = await sslPinnedFetch(url, sslOptions);
-    const bodyText = response.bodyString || response.data || '';
-
+    const response = await fetch(url, config);
     return {
       status: response.status,
-      ok: response.status >= 200 && response.status < 300,
+      ok: response.ok,
       json: async () => {
-        if (!bodyText) return null;
         try {
-          return JSON.parse(bodyText);
+          return await response.json();
         } catch {
           return null;
         }

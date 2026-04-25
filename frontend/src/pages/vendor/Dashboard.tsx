@@ -12,6 +12,8 @@ const VendorDashboard: React.FC = () => {
       const response = await api.get('/api/vendors/stats');
       return response.data.data;
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: ordersData } = useQuery({
@@ -20,6 +22,8 @@ const VendorDashboard: React.FC = () => {
       const response = await api.get('/api/vendors/orders');
       return response.data.data;
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const orders = ordersData?.orders || [];
@@ -110,7 +114,7 @@ const VendorDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {orders.slice(0, 5).map((order: { _id: string; orderNumber: string; user?: { fullName: string }; items?: unknown[]; status: string; totalAmount: number }) => (
+                {orders.slice(0, 5).map((order: { _id: string; orderNumber: string; user?: { fullName: string }; items?: unknown[]; status: string; total: number }) => (
                   <tr key={order._id} className="border-b hover:bg-gray-50">
                     <td className="py-3 px-4 font-medium">{order.orderNumber}</td>
                     <td className="py-3 px-4">{order.user?.fullName}</td>
@@ -118,7 +122,7 @@ const VendorDashboard: React.FC = () => {
                     <td className="py-3 px-4">
                       <span className="badge bg-blue-100 text-blue-800">{order.status}</span>
                     </td>
-                    <td className="py-3 px-4">{formatCurrency(order.totalAmount)}</td>
+                    <td className="py-3 px-4">{formatCurrency(order.total ?? 0)}</td>
                   </tr>
                 ))}
               </tbody>

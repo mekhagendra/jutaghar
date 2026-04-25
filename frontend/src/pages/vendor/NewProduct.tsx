@@ -40,7 +40,7 @@ const NewProduct: React.FC = () => {
     },
     onSuccess: () => {
       toast.success('Product created successfully!');
-      navigate('/vendor/dashboard');
+      navigate('/seller/dashboard');
     },
     onError: (error: unknown) => {
       const message = error && typeof error === 'object' && 'response' in error

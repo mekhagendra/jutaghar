@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,6 +7,12 @@ import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore, MfaRequiredError } from '@/stores/authStore';
 import { LogIn, Clock, Mail } from 'lucide-react';
 import api from '@/lib/api';
+
+const getDashboardPath = (role?: string) => {
+  if (role === 'admin' || role === 'manager') return '/admin/dashboard';
+  if (role === 'seller') return '/seller/dashboard';
+  return '/';
+};
 
 const PASSWORD_POLICY = z
   .string()
@@ -25,7 +31,14 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, googleLogin, mfaLoginVerify } = useAuthStore();
+  const { login, googleLogin, mfaLoginVerify, isAuthenticated, user } = useAuthStore();
+
+  // Redirect already-authenticated users to their dashboard
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(getDashboardPath(user?.role), { replace: true });
+    }
+  }, [isAuthenticated, navigate, user?.role]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,7 +68,8 @@ const Login: React.FC = () => {
       setError('');
       setSuccess('');
       await login(data.email, data.password);
-      navigate('/');
+      const { user: loggedInUser } = useAuthStore.getState();
+      navigate(getDashboardPath(loggedInUser?.role));
     } catch (err: unknown) {
       if (err instanceof MfaRequiredError) {
         setMfaPending({ mfaToken: err.mfaToken });
@@ -80,7 +94,8 @@ const Login: React.FC = () => {
       setLoading(true);
       setError('');
       await mfaLoginVerify(mfaPending.mfaToken, mfaCode);
-      navigate('/');
+      const { user: loggedInUser } = useAuthStore.getState();
+      navigate(getDashboardPath(loggedInUser?.role));
     } catch (err: unknown) {
       const e2 = err as { response?: { data?: { message?: string } } };
       setError(e2.response?.data?.message || 'Invalid code. Please try again.');
@@ -374,7 +389,8 @@ const Login: React.FC = () => {
                 setError('');
                 if (credentialResponse.credential) {
                   await googleLogin(credentialResponse.credential);
-                  navigate('/');
+                  const { user: loggedInUser } = useAuthStore.getState();
+                  navigate(getDashboardPath(loggedInUser?.role));
                 }
               } catch (err: unknown) {
                 const e = err as { response?: { data?: { message?: string } } };

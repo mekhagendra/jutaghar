@@ -2,6 +2,7 @@ import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
 import TaxSettings from '../models/TaxSettings.js';
+import { asNumber, asString, stripOperators } from '../utils/sanitizeInput.js';
 
 // Get vendor statistics
 export const getVendorStats = async (req, res) => {
@@ -76,13 +77,16 @@ export const getVendorStats = async (req, res) => {
 // Get vendor orders
 export const getVendorOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 10)));
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
     const vendorId = req.user._id;
 
     const query = { 'items.vendor': vendorId };
     if (status) query.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const [orders, total] = await Promise.all([
       Order.find(query)
@@ -90,7 +94,7 @@ export const getVendorOrders = async (req, res) => {
         .populate('items.product', 'name images')
         .sort('-createdAt')
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(limit),
       Order.countDocuments(query)
     ]);
 
@@ -108,10 +112,10 @@ export const getVendorOrders = async (req, res) => {
       data: {
         orders: filteredOrders,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / limit)
         }
       }
     });

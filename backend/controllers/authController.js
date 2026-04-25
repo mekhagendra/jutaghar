@@ -1,4 +1,5 @@
 import { validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 import { OAuth2Client } from 'google-auth-library';
 import { authenticator as totpAuthenticator } from 'otplib';
 import qrcode from 'qrcode';
@@ -7,6 +8,7 @@ import PendingRegistration from '../models/PendingRegistration.js';
 import RefreshSession from '../models/RefreshSession.js';
 import Review from '../models/Review.js';
 import User from '../models/User.js';
+import { verifyAppleIdentityToken } from '../utils/appleAuth.js';
 import { writeAudit } from '../utils/audit.js';
 import { comparePassword, generateMfaToken, generateRefreshToken, generateToken, hashPassword, verifyToken } from '../utils/auth.js';
 import logger from '../utils/logger.js';
@@ -57,16 +59,18 @@ function getRefreshTokenFromRequest(req) {
 
 /** Helper: create a RefreshSession and return the signed token */
 async function createSession(userId, req) {
+  // Generate a temporary ObjectId so the token can embed the session id
+  // before persisting, avoiding a two-step write with a placeholder hash.
+  const sessionId = new mongoose.Types.ObjectId();
+  const rawToken = generateRefreshToken(userId, sessionId);
   const session = await RefreshSession.create({
+    _id: sessionId,
     userId,
-    hashedToken: 'pending', // replaced once token is signed
+    hashedToken: RefreshSession.hashToken(rawToken),
     deviceId: req.headers['x-device-id'] || null,
     userAgent: req.headers['user-agent'] || null,
-    ip: req.ip || null
+    ip: req.ip || null,
   });
-  const rawToken = generateRefreshToken(userId, session._id);
-  session.hashedToken = RefreshSession.hashToken(rawToken);
-  await session.save();
   return { session, rawToken };
 }
 
@@ -375,6 +379,7 @@ export const login = async (req, res) => {
       }
     });
   } catch (error) {
+    logger.error({ err: error }, 'login error');
     res.status(500).json({
       success: false,
       message: 'Internal error', requestId: req.id
@@ -694,6 +699,152 @@ export const googleLogin = async (req, res) => {
     const accessToken = generateToken(user._id, user.role);
     const { rawToken: refreshToken } = await createSession(user._id, req);
     setRefreshCookie(res, refreshToken);
+
+    res.json({
+      success: true,
+      data: {
+        user: toAuthUser(user),
+        accessToken,
+        refreshToken
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal error', requestId: req.id
+    });
+  }
+};
+
+// Apple Sign-In / Sign-Up
+// Body: { identityToken: string, fullName?: { givenName?: string, familyName?: string } | string, email?: string }
+// Apple only sends `email` and `fullName` to the client on the FIRST authorization.
+// The mobile client must forward those values along with subsequent identityToken on first sign-in.
+export const appleLogin = async (req, res) => {
+  try {
+    const { identityToken } = req.body || {};
+    if (!identityToken || typeof identityToken !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Apple identityToken is required'
+      });
+    }
+
+    let payload;
+    try {
+      payload = await verifyAppleIdentityToken(identityToken);
+    } catch (err) {
+      if (err.code === 'CONFIG_MISSING') {
+        return res.status(500).json({
+          success: false,
+          message: 'Apple Sign-In is not configured on the server',
+          requestId: req.id
+        });
+      }
+      if (err.code === 'KEYS_UNAVAILABLE') {
+        return res.status(503).json({
+          success: false,
+          message: 'Unable to verify Apple identity token at this time',
+          requestId: req.id
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Apple identity token'
+      });
+    }
+
+    const appleId = payload.sub;
+    if (!appleId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Apple identity token (missing subject)'
+      });
+    }
+
+    const tokenEmail = typeof payload.email === 'string' ? payload.email.toLowerCase().trim() : null;
+    const emailVerifiedClaim = payload.email_verified === true || payload.email_verified === 'true';
+    // Trust client-provided email only when token doesn't carry one (private relay first-time flow rarely happens; usually the token includes it).
+    const clientEmailRaw = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : null;
+    const email = tokenEmail || clientEmailRaw || null;
+
+    // Parse client-provided fullName (Apple sends this only on first authorization).
+    let providedFullName = null;
+    const rawName = req.body?.fullName;
+    if (rawName && typeof rawName === 'object') {
+      const given = typeof rawName.givenName === 'string' ? rawName.givenName.trim() : '';
+      const family = typeof rawName.familyName === 'string' ? rawName.familyName.trim() : '';
+      const combined = [given, family].filter(Boolean).join(' ').trim();
+      if (combined) providedFullName = combined;
+    } else if (typeof rawName === 'string' && rawName.trim()) {
+      providedFullName = rawName.trim();
+    }
+
+    // Find existing user: prefer appleId, then email.
+    let user = await User.findOne({
+      $or: [
+        { appleId },
+        ...(email ? [{ email }] : [])
+      ]
+    });
+
+    let createdNew = false;
+    if (user) {
+      let dirty = false;
+      if (!user.appleId) { user.appleId = appleId; dirty = true; }
+      // Capture name on first sign-in if we don't already have one and the client provided it.
+      if (providedFullName && (!user.fullName || user.fullName === user.email?.split('@')[0])) {
+        user.fullName = providedFullName;
+        dirty = true;
+      }
+      // Backfill email if user record somehow lacks one (shouldn't happen — schema requires it).
+      if (!user.email && email) { user.email = email; dirty = true; }
+      if (dirty) await user.save();
+    } else {
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email not available from Apple account'
+        });
+      }
+      const fallbackName = providedFullName || email.split('@')[0];
+      user = await User.create({
+        email,
+        fullName: fallbackName,
+        appleId,
+        role: 'customer',
+        status: 'active',
+        emailVerified: emailVerifiedClaim || true,
+      });
+      createdNew = true;
+    }
+
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is suspended'
+      });
+    }
+
+    if (user.status === 'pending' && user.role === 'seller') {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is pending approval'
+      });
+    }
+
+    const accessToken = generateToken(user._id, user.role);
+    const { rawToken: refreshToken } = await createSession(user._id, req);
+    setRefreshCookie(res, refreshToken);
+
+    writeAudit({
+      req,
+      action: createdNew ? 'auth.apple.signup' : 'auth.apple.login',
+      target: 'user',
+      targetId: user._id,
+      actor: String(user._id),
+      metadata: { email: user.email }
+    }).catch(() => {});
 
     res.json({
       success: true,

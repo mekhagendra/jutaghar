@@ -22,7 +22,7 @@ const Sale: React.FC = () => {
   const products: Product[] = data?.products || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50">
       {/* Hero Banner */}
       <div className="relative bg-gradient-to-r from-red-600 via-red-500 to-orange-500 overflow-hidden">
         {/* Animated background shapes */}

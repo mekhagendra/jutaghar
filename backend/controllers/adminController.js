@@ -505,3 +505,127 @@ export const getAuditLog = async (req, res) => {
     });
   }
 };
+
+// Search/list products for admin featured management
+export const getAdminProducts = async (req, res) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin can manage featured products'
+      });
+    }
+
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 20)));
+    const search = safeQuery.search ? asString(safeQuery.search) : '';
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
+
+    const query = {};
+    if (status) query.status = status;
+    if (search) {
+      const safeSearch = escapeRegex(search);
+      query.$or = [
+        { name: { $regex: safeSearch, $options: 'i' } },
+        { description: { $regex: safeSearch, $options: 'i' } },
+        { tags: { $regex: safeSearch, $options: 'i' } }
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [products, total] = await Promise.all([
+      Product.find(query)
+        .populate('vendor', 'fullName businessName role')
+        .populate('category', 'name')
+        .populate('brand', 'name')
+        .sort('-createdAt')
+        .skip(skip)
+        .limit(limit),
+      Product.countDocuments(query)
+    ]);
+
+    const normalizedProducts = products.map((product) => ({
+      ...product.toObject(),
+      isFeatured: Array.isArray(product.tags) && product.tags.includes('featured'),
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        products: normalizedProducts,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    res.status(errorStatus(error)).json({
+      success: false,
+      message: 'Internal error', requestId: req.id
+    });
+  }
+};
+
+// Mark/unmark product as featured (admin only)
+export const updateFeaturedProduct = async (req, res) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin can manage featured products'
+      });
+    }
+
+    const sanitizedBody = stripOperators({ ...req.body });
+    const featuredRaw = sanitizedBody.featured;
+    const featured = typeof featuredRaw === 'boolean'
+      ? featuredRaw
+      : asString(featuredRaw) === 'true';
+
+    const product = await Product.findById(asObjectId(req.params.id));
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const existingTags = Array.isArray(product.tags) ? product.tags : [];
+    const nextTags = featured
+      ? Array.from(new Set([...existingTags, 'featured']))
+      : existingTags.filter((tag) => tag !== 'featured');
+
+    product.tags = nextTags;
+    await product.save();
+
+    await writeAudit({
+      req,
+      action: featured ? 'ADMIN_FEATURED_PRODUCT_ADDED' : 'ADMIN_FEATURED_PRODUCT_REMOVED',
+      target: 'product',
+      targetId: product._id,
+      metadata: {
+        featured,
+        tags: product.tags,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        product,
+        isFeatured: Array.isArray(product.tags) && product.tags.includes('featured'),
+      },
+      message: featured ? 'Product marked as featured' : 'Product removed from featured',
+    });
+  } catch (error) {
+    res.status(errorStatus(error)).json({
+      success: false,
+      message: 'Internal error', requestId: req.id
+    });
+  }
+};

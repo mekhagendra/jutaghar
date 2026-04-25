@@ -46,7 +46,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
 
   // Check if product has special tags
   const isNew = product.tags?.includes('new-arrival');
-  const isFeatured = product.tags?.includes('featured');
   const isBestSeller = product.tags?.includes('best-seller');
   const isLimitedStock = product.stock > 0 && product.stock < 10;
   const isOutOfStock = product.stock === 0;
@@ -82,11 +81,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
           {isNew && (
             <span className="px-2 py-1 text-xs font-semibold rounded bg-green-500 text-white">
               New
-            </span>
-          )}
-          {isFeatured && (
-            <span className="px-2 py-1 text-xs font-semibold rounded bg-purple-500 text-white">
-              Featured
             </span>
           )}
           {isBestSeller && (

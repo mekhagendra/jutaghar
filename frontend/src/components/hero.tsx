@@ -40,7 +40,7 @@ const Hero: React.FC = () => {
 
   return (
     <section>
-      <Carousel slides={heroSlides} autoPlay interval={5000} />
+      <Carousel slides={heroSlides} autoPlay interval={5000} height="h-[300px] md:h-[500px] lg:h-[600px]" />
     </section>
   );
 };

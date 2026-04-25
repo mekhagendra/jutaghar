@@ -33,5 +33,21 @@ allprojects {
   }
 }
 
+subprojects { subproject ->
+  afterEvaluate {
+    if (subproject.plugins.hasPlugin("com.android.application") || subproject.plugins.hasPlugin("com.android.library")) {
+      def compileSdk = rootProject.ext.has("compileSdkVersion") ? rootProject.ext.compileSdkVersion : 36
+      def targetSdk = rootProject.ext.has("targetSdkVersion") ? rootProject.ext.targetSdkVersion : 36
+
+      subproject.android {
+        compileSdkVersion compileSdk
+        defaultConfig {
+          targetSdkVersion targetSdk
+        }
+      }
+    }
+  }
+}
+
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"

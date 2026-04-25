@@ -1,11 +1,11 @@
-const spkiPin = process.env.SPKI_PIN || '';
-const domain = process.env.EXPO_PUBLIC_DOMAIN || 'jutaghar.com';
-
-// Derive the Google Sign-In iOS URL scheme from the full client ID.
-// e.g. "624...mu.apps.googleusercontent.com" → "com.googleusercontent.apps.624...mu"
-const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
-const googleIosUrlScheme = googleClientId
-  ? `com.googleusercontent.apps.${googleClientId.replace('.apps.googleusercontent.com', '')}`
+// Google OAuth client IDs.
+// - EXPO_PUBLIC_GOOGLE_CLIENT_ID: Web client ID (used by backend to verify the idToken).
+// - EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: iOS client ID (required by Google Sign-In SDK on iOS).
+//   Create one in Google Cloud Console → Credentials → "iOS" type for bundle id
+//   `com.metabyte.jutaghar`. Its reversed client ID is the URL scheme used below.
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+const googleIosUrlScheme = googleIosClientId
+  ? `com.googleusercontent.apps.${googleIosClientId.replace('.apps.googleusercontent.com', '')}`
   : 'com.googleusercontent.apps.PLACEHOLDER';
 
 /** @type {import('@expo/config').ExpoConfig} */
@@ -23,17 +23,7 @@ module.exports = {
       bundleIdentifier: 'com.metabyte.jutaghar',
       buildNumber: '1',
       supportsTablet: true,
-      infoPlist: {
-        NSAppTransportSecurity: {
-          NSAllowsArbitraryLoads: false,
-          NSPinnedDomains: {
-            [domain]: {
-              NSIncludesSubdomains: true,
-              NSPinnedCAIdentities: [{ 'SPKI-SHA256-BASE64': spkiPin }],
-            },
-          },
-        },
-      },
+      usesAppleSignIn: true,
     },
 
     android: {
@@ -54,6 +44,7 @@ module.exports = {
 
     plugins: [
       'expo-router',
+      'expo-apple-authentication',
       [
         'expo-splash-screen',
         {
@@ -70,13 +61,6 @@ module.exports = {
           iosUrlScheme: googleIosUrlScheme,
         },
       ],
-      [
-        './plugins/withAndroidNetworkSecurityConfig',
-        {
-          domains: [domain],
-          spkiPins: [spkiPin],
-        },
-      ],
     ],
 
     experiments: {
@@ -85,9 +69,6 @@ module.exports = {
 
     extra: {
       router: {},
-      sslPinning: {
-        certs: ['jutaghar_prod'],
-      },
       playIntegrity: {
         cloudProjectNumber: '',
       },

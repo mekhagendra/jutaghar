@@ -1,13 +1,15 @@
 import express from 'express';
 import User from '../models/User.js';
 import Product from '../models/Product.js';
+import { asString, stripOperators } from '../utils/sanitizeInput.js';
 
 const router = express.Router();
 
 // Get all active vendors (public route for outlets page)
 router.get('/', async (req, res) => {
   try {
-    const { isApproved } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const isApproved = safeQuery.isApproved ? asString(safeQuery.isApproved) : '';
     
     const query = {
       role: 'seller',

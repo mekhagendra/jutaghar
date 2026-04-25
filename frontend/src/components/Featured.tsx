@@ -8,7 +8,7 @@ const Featured: React.FC = () => {
   const { data: featured, isLoading } = useQuery<{ data: { products: Product[] } }>({
     queryKey: ['products', 'featured'],
     queryFn: async () => {
-      const response = await api.get('/api/products?sort=-views&limit=8');
+      const response = await api.get('/api/products?tag=featured&limit=8');
       return response.data;
     },
   });
@@ -31,6 +31,8 @@ const Featured: React.FC = () => {
             title="Featured Products"
             subtitle="Handpicked for you"
             itemsPerView={4}
+            autoScroll
+            autoScrollInterval={3000}
             showViewAll
             viewAllLink="/products?tag=featured"
           />

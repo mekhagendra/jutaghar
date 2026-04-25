@@ -3,12 +3,16 @@ import Category from '../models/Category.js';
 import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
 import { saveBase64Image } from '../utils/imageStorage.js';
+import { asObjectId, asString, stripOperators } from '../utils/sanitizeInput.js';
 
 // ========== CATEGORIES ==========
 
 export const getCategories = async (req, res) => {
   try {
-    const { status, withInventory, gender } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
+    const withInventory = safeQuery.withInventory ? asString(safeQuery.withInventory) : '';
+    const gender = safeQuery.gender ? asString(safeQuery.gender) : '';
     const query = {};
     if (status) query.status = status;
 
@@ -80,7 +84,7 @@ export const createCategory = async (req, res) => {
       });
     }
 
-    const categoryData = { ...req.body };
+    const categoryData = stripOperators({ ...req.body });
     if (categoryData.image) {
       categoryData.image = await saveBase64Image(categoryData.image, 'categories');
     }
@@ -107,13 +111,14 @@ export const createCategory = async (req, res) => {
 
 export const updateCategory = async (req, res) => {
   try {
-    const updateData = { ...req.body };
+    const updateData = stripOperators({ ...req.body });
+    const categoryId = asObjectId(req.params.id);
     if (updateData.image) {
       updateData.image = await saveBase64Image(updateData.image, 'categories');
     }
 
     const category = await Category.findByIdAndUpdate(
-      req.params.id,
+      categoryId,
       updateData,
       { new: true, runValidators: true }
     );
@@ -139,7 +144,8 @@ export const updateCategory = async (req, res) => {
 
 export const deleteCategory = async (req, res) => {
   try {
-    const category = await Category.findByIdAndDelete(req.params.id);
+    const categoryId = asObjectId(req.params.id);
+    const category = await Category.findByIdAndDelete(categoryId);
 
     if (!category) {
       return res.status(404).json({
@@ -164,7 +170,9 @@ export const deleteCategory = async (req, res) => {
 
 export const getBrands = async (req, res) => {
   try {
-    const { status, withInventory } = req.query;
+    const safeQuery = stripOperators({ ...req.query });
+    const status = safeQuery.status ? asString(safeQuery.status) : '';
+    const withInventory = safeQuery.withInventory ? asString(safeQuery.withInventory) : '';
     const query = {};
     if (status) query.status = status;
 
@@ -222,7 +230,7 @@ export const createBrand = async (req, res) => {
       });
     }
 
-    const brandData = { ...req.body };
+    const brandData = stripOperators({ ...req.body });
     if (brandData.logo) {
       brandData.logo = await saveBase64Image(brandData.logo, 'brands');
     }
@@ -249,13 +257,14 @@ export const createBrand = async (req, res) => {
 
 export const updateBrand = async (req, res) => {
   try {
-    const updateData = { ...req.body };
+    const updateData = stripOperators({ ...req.body });
+    const brandId = asObjectId(req.params.id);
     if (updateData.logo) {
       updateData.logo = await saveBase64Image(updateData.logo, 'brands');
     }
 
     const brand = await Brand.findByIdAndUpdate(
-      req.params.id,
+      brandId,
       updateData,
       { new: true, runValidators: true }
     );
@@ -281,7 +290,8 @@ export const updateBrand = async (req, res) => {
 
 export const deleteBrand = async (req, res) => {
   try {
-    const brand = await Brand.findByIdAndDelete(req.params.id);
+    const brandId = asObjectId(req.params.id);
+    const brand = await Brand.findByIdAndDelete(brandId);
 
     if (!brand) {
       return res.status(404).json({

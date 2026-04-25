@@ -41,7 +41,7 @@ const DeleteAccount: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="bg-gray-50 flex items-center justify-center py-20 px-4">
         <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
           <div className="text-green-500 text-5xl mb-4">✓</div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Account Deleted</h2>
@@ -52,7 +52,7 @@ const DeleteAccount: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50">
       <div className="bg-gradient-to-r from-red-600 to-red-800 text-white py-16">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold mb-4">Delete Account</h1>

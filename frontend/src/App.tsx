@@ -47,6 +47,7 @@ const AdminManageProducts = lazy(() => import('@/pages/admin/ManageProducts'));
 const ManageUsers = lazy(() => import('@/pages/admin/ManageUsers'));
 const ManageHeroSlides = lazy(() => import('@/pages/admin/ManageHeroSlides'));
 const AdminDeliverySettings = lazy(() => import('@/pages/admin/DeliverySettings'));
+const FeaturedProducts = lazy(() => import('@/pages/admin/FeaturedProducts'));
 
 // Vendor pages
 const NewProduct = lazy(() => import('@/pages/vendor/NewProduct'));
@@ -176,6 +177,7 @@ function App() {
             <Route path="/admin/categories" element={<ManageCategories />} />
             <Route path="/admin/brands" element={<ManageBrands />} />
             <Route path="/admin/products" element={<AdminManageProducts />} />
+            <Route path="/admin/featured-products" element={<FeaturedProducts />} />
             <Route path="/admin/hero-slides" element={<ManageHeroSlides />} />
             <Route path="/admin/delivery-settings" element={<AdminDeliverySettings />} />
           </Route>
@@ -188,13 +190,13 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/vendor/dashboard" element={<VendorDashboard />} />
-            <Route path="/vendor/orders" element={<VendorOrders />} />
+            <Route path="/seller/dashboard" element={<VendorDashboard />} />
+            <Route path="/seller/orders" element={<VendorOrders />} />
             <Route path="/products/new" element={<NewProduct />} />
             <Route path="/products/manage" element={<ManageProducts />} />
             <Route path="/products/:id/edit" element={<EditProduct />} />
             <Route path="/inventory/manage" element={<ManageInventory />} />
-            <Route path="/vendor/tax" element={<VendorTaxSettings />} />
+            <Route path="/seller/tax" element={<VendorTaxSettings />} />
           </Route>
 
           {/* Customer / User routes */}

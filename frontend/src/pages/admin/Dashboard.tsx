@@ -3,9 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { Users, Package, ShoppingCart, DollarSign, Truck } from 'lucide-react';
+import { Users, Package, ShoppingCart, DollarSign, Truck, Star } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
 
 const AdminDashboard: React.FC = () => {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
@@ -74,6 +77,12 @@ const AdminDashboard: React.FC = () => {
           <Package className="w-12 h-12 text-primary-600 mx-auto mb-3" />
           <h3 className="text-xl font-semibold">Manage Products</h3>
         </Link>
+        {isAdmin && (
+          <Link to="/admin/featured-products" className="card hover:shadow-lg transition text-center py-8">
+            <Star className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+            <h3 className="text-xl font-semibold">Featured Products</h3>
+          </Link>
+        )}
         <Link to="/admin/categories" className="card hover:shadow-lg transition text-center py-8">
           <Package className="w-12 h-12 text-primary-600 mx-auto mb-3" />
           <h3 className="text-xl font-semibold">Categories</h3>

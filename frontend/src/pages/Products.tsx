@@ -35,6 +35,7 @@ const Products: React.FC = () => {
   const brand = searchParams.get('brand') || '';
   const search = searchParams.get('search') || '';
   const sort = searchParams.get('sort') || '';
+  const tag = searchParams.get('tag') || '';
   const vendor = searchParams.get('vendor') || '';
   const minPrice = searchParams.get('minPrice') || '';
   const maxPrice = searchParams.get('maxPrice') || '';
@@ -135,11 +136,12 @@ const Products: React.FC = () => {
   const colorOptions: string[] = Array.isArray(colorsData?.data) ? colorsData.data : [];
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['products', gender, category, brand, search, sort, vendor, minPrice, maxPrice, size, color, inStock],
+    queryKey: ['products', gender, category, brand, search, sort, tag, vendor, minPrice, maxPrice, size, color, inStock],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (gender) params.append('gender', gender);
+      if (tag) params.append('tag', tag);
       
       // Convert category names/slugs to IDs if needed
       if (selectedCategories.length && categoryOptions.length > 0) {

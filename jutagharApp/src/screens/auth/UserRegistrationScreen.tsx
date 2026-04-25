@@ -1,19 +1,19 @@
-import { googleLogin, requestSignupOtp, verifySignupOtp } from '@/features/auth';
+import { appleLogin, googleLogin, requestSignupOtp, verifySignupOtp } from '@/features/auth';
 import { AuthFormStyles } from '@/shared/authFormStyles';
 import { Colors } from '@/shared/theme';
 import { isValidEmail, normalizeEmail } from '@/utils/validation';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 let GoogleSignin: any = null;
@@ -25,6 +25,14 @@ try {
   isSuccessResponse = mod.isSuccessResponse;
 } catch {
   // Native module not available (e.g. Expo Go)
+}
+
+let AppleAuthentication: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  AppleAuthentication = require('expo-apple-authentication');
+} catch {
+  // Native module not available
 }
 
 interface UserRegistrationScreenProps {
@@ -47,16 +55,40 @@ export default function UserRegistrationScreen({
   const [otp, setOtp] = useState('');
   const [showOtpStep, setShowOtpStep] = useState(false);
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
 
   useEffect(() => {
     if (!GoogleSignin || !googleClientId) {
       return;
     }
 
-    GoogleSignin.configure({
-      webClientId: googleClientId,
-    });
-  }, [googleClientId]);
+    try {
+      GoogleSignin.configure({
+        webClientId: googleClientId,
+        ...(Platform.OS === 'ios' && googleIosClientId ? { iosClientId: googleIosClientId } : {}),
+      });
+    } catch {
+      // Configuration failure should never crash the screen.
+    }
+  }, [googleClientId, googleIosClientId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (Platform.OS !== 'ios' || !AppleAuthentication?.isAvailableAsync) {
+      return;
+    }
+    AppleAuthentication.isAvailableAsync()
+      .then((available: boolean) => {
+        if (!cancelled) setAppleAuthAvailable(!!available);
+      })
+      .catch(() => {
+        if (!cancelled) setAppleAuthAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -155,6 +187,13 @@ export default function UserRegistrationScreen({
       Alert.alert('Not Available', 'Google Sign-In requires a development build. It is not supported in Expo Go.');
       return;
     }
+    if (Platform.OS === 'ios' && !googleIosClientId) {
+      Alert.alert(
+        'Google Sign-In Unavailable',
+        'Google Sign-In is not configured for this build. Please use email/password or Sign in with Apple.'
+      );
+      return;
+    }
     setIsLoading(true);
     try {
       await GoogleSignin.hasPlayServices();
@@ -167,9 +206,48 @@ export default function UserRegistrationScreen({
         }
       }
     } catch (error: any) {
-      if (error.code !== '12501') {
-        Alert.alert('Google Sign-Up Failed', error.message || 'Please try again.');
+      if (error?.code !== '12501') {
+        Alert.alert('Google Sign-Up Failed', error?.message || 'Please try again.');
       }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    if (!AppleAuthentication) {
+      Alert.alert('Not Available', 'Sign in with Apple requires a development build.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential?.identityToken) {
+        throw new Error('No identity token returned by Apple.');
+      }
+      const user = await appleLogin({
+        identityToken: credential.identityToken,
+        authorizationCode: credential.authorizationCode ?? null,
+        user: credential.user ?? null,
+        email: credential.email ?? null,
+        fullName: credential.fullName
+          ? {
+              givenName: credential.fullName.givenName ?? null,
+              familyName: credential.fullName.familyName ?? null,
+            }
+          : null,
+      });
+      onRegister(user);
+    } catch (error: any) {
+      if (error?.code === 'ERR_REQUEST_CANCELED') {
+        return;
+      }
+      Alert.alert('Apple Sign-Up Failed', error?.message || 'Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -190,6 +268,17 @@ export default function UserRegistrationScreen({
         </View>
 
         <View style={styles.formContainer}>
+
+          {/* Sign in with Apple (iOS only) — required by App Store guideline 4.8 */}
+          {Platform.OS === 'ios' && appleAuthAvailable && AppleAuthentication?.AppleAuthenticationButton && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={8}
+              style={styles.appleButton}
+              onPress={handleAppleSignUp}
+            />
+          )}
 
           {/* Google Sign-Up Button */}
           <TouchableOpacity
@@ -392,6 +481,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 14,
     marginBottom: 16,
+  },
+  appleButton: {
+    width: '100%',
+    height: 48,
+    marginBottom: 12,
   },
   googleButtonIcon: {
     fontSize: 20,

@@ -27,6 +27,7 @@ export const getProducts = async (req, res) => {
     const color = safeQuery.color ? asString(safeQuery.color) : '';
     const size = safeQuery.size ? asString(safeQuery.size) : '';
     const onSale = safeQuery.onSale ? asString(safeQuery.onSale) : '';
+    const tag = safeQuery.tag ? asString(safeQuery.tag) : '';
 
     // Map sort values to MongoDB fields
     let sortField = '-createdAt'; // default
@@ -104,6 +105,11 @@ export const getProducts = async (req, res) => {
     // Filter by onSale
     if (onSale === 'true') {
       query.onSale = true;
+    }
+
+    // Filter by tag (e.g. featured, best-seller, new-arrival)
+    if (tag) {
+      query.tags = tag;
     }
 
     // Filter by variant size
@@ -193,6 +199,11 @@ export const createProduct = async (req, res) => {
       vendor: req.user._id
     };
 
+    // Only admin/manager can assign custom tags like featured.
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+      delete productData.tags;
+    }
+
     // Set status to active by default for vendors
     if (!productData.status) {
       productData.status = 'active';
@@ -234,6 +245,12 @@ export const updateProduct = async (req, res) => {
     }
 
     const sanitizedBody = stripOperators({ ...req.body });
+
+    // Prevent non-admin users from changing tags via direct API calls.
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+      delete sanitizedBody.tags;
+    }
+
     Object.assign(product, sanitizedBody);
     await product.save();
 

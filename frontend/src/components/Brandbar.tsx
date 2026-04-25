@@ -17,7 +17,7 @@ const Brandbar: React.FC = () => {
 
   return (
     <div className="bg-white border-b border-gray-100">
-      <div className="container mx-auto px-4 py-3 flex items-center gap-6">
+      <div className="container mx-auto px-4 py-3 flex items-center gap-3 sm:gap-6">
         {/* Logo */}
         <Link to="/" onClick={() => window.scrollTo(0, 0)} className="flex-shrink-0">
           <img
@@ -28,14 +28,14 @@ const Brandbar: React.FC = () => {
         </Link>
 
         {/* Search bar */}
-        <form onSubmit={handleSearch} className="flex-1 max-w-2xl">
+        <form onSubmit={handleSearch} className="flex-1 min-w-0 max-w-[572px]">
           <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for shoes, brands, categories…"
-              className="flex-1 bg-transparent px-5 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
+              placeholder="Search items.."
+              className="flex-1 bg-transparent px-5 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none min-w-[100px]"
             />
             <button
               type="submit"

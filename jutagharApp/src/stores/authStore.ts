@@ -1,7 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '@/api';
-import type { User, AuthResponse } from '@/types';
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/shared/secureStorage';
+import type { AuthResponse, User } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AUTH_STORAGE_KEY = 'jutaghar_auth';
 
@@ -186,6 +186,30 @@ export async function verifyForgotPasswordOtp(email: string, otp: string, newPas
 
 export async function googleLogin(idToken: string): Promise<User> {
   const response = await api.post<AuthResponse>('/api/auth/google', { credential: idToken });
+  const { user, accessToken, refreshToken } = response.data;
+
+  authState = {
+    user,
+    accessToken,
+    refreshToken,
+    isAuthenticated: true,
+  };
+
+  await persistAuthState();
+  notifyListeners();
+  return user;
+}
+
+export interface AppleLoginPayload {
+  identityToken: string;
+  authorizationCode?: string | null;
+  user?: string | null;
+  email?: string | null;
+  fullName?: { givenName?: string | null; familyName?: string | null } | null;
+}
+
+export async function appleLogin(payload: AppleLoginPayload): Promise<User> {
+  const response = await api.post<AuthResponse>('/api/auth/apple', payload);
   const { user, accessToken, refreshToken } = response.data;
 
   authState = {

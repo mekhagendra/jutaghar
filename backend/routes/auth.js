@@ -61,6 +61,7 @@ router.post('/register/request-otp', authLimiter, registerValidation, authContro
 router.post('/register/verify-otp', authLimiter, otpVerifyLimiter, verifyOtpValidation, authController.verifyRegisterOtp);
 router.post('/login', authLimiter, loginValidation, authController.login);
 router.post('/google', authLimiter, authController.googleLogin);
+router.post('/apple', authLimiter, authController.appleLogin);
 router.post('/forgot-password/request-otp', otpRequestLimiter, [body('email').isEmail().normalizeEmail()], authController.requestForgotPasswordOtp);
 router.post('/forgot-password/verify-otp', otpVerifyLimiter, forgotPasswordVerifyValidation, authController.verifyForgotPasswordOtp);
 router.post('/refresh', refreshLimiter, authController.refreshToken);

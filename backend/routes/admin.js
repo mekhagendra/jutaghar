@@ -25,4 +25,8 @@ router.patch('/vendors/:id/status', adminController.updateVendorStatus);
 router.get('/stats', adminController.getAdminStats);
 router.get('/audit-log', adminController.getAuditLog);
 
+// Product featured management (admin only)
+router.get('/products', adminController.getAdminProducts);
+router.patch('/products/:id/featured', adminController.updateFeaturedProduct);
+
 export default router;

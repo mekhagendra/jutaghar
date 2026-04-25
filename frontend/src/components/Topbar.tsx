@@ -65,7 +65,7 @@ const Topbar: React.FC = () => {
   return (
     <>
       {/* Top Bar */}
-      <div className="bg-gray-900 text-white text-sm">
+      <div className="bg-gradient-to-r from-amber-900 to-amber-600 text-white text-sm">
         <div className="container mx-auto px-4 py-2 flex justify-between items-center">
           <div className="hidden md:block">
             <span>Free Shipping on Orders Over Rs. 5000</span>

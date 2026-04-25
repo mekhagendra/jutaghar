@@ -20,6 +20,7 @@ import {
   Receipt,
   Settings,
   ChevronDown,
+  Star,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@/types';
@@ -43,16 +44,17 @@ const adminNav: NavItem[] = [
   { to: '/admin/categories', label: 'Manage Categories', icon: Tag },
   { to: '/admin/brands', label: 'Manage Brands', icon: Bookmark },
   { to: '/admin/products', label: 'Manage Products', icon: Package },
+  { to: '/admin/featured-products', label: 'Featured Products', icon: Star },
   { to: '/admin/hero-slides', label: 'Hero Slides', icon: Image },
   { to: '/admin/delivery-settings', label: 'Delivery Setting', icon: Truck },
 ];
 
 const sellerNav: NavItem[] = [
-  { to: '/vendor/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/seller/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/products/new', label: 'Add Products', icon: PlusCircle, end: true },
   { to: '/products/manage', label: 'Manage Products', icon: Package, end: true },
-  { to: '/vendor/orders', label: 'Manage Orders', icon: ClipboardList, end: true },
-  { to: '/vendor/tax', label: 'Manage Tax', icon: Receipt, end: true },
+  { to: '/seller/orders', label: 'Manage Orders', icon: ClipboardList, end: true },
+  { to: '/seller/tax', label: 'Manage Tax', icon: Receipt, end: true },
 ];
 
 const customerNav: NavItem[] = [
@@ -200,24 +202,26 @@ const DashboardLayout: React.FC = () => {
 
   // Shared nav item renderer — accepts optional click handler (for drawer close)
   const renderNavItems = (onItemClick?: () => void) =>
-    cfg.navItems.map(({ to, label, icon: Icon, end }) => (
-      <li key={to}>
-        <NavLink
-          to={to}
-          end={end}
-          onClick={onItemClick}
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              isActive ? cfg.activeLink : `${cfg.inactiveLink} ${cfg.inactiveHover}`
-            }`
-          }
-        >
-          <Icon className="w-5 h-5 shrink-0" />
-          <span>{label}</span>
-          <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-40" />
-        </NavLink>
-      </li>
-    ));
+    cfg.navItems
+      .filter(({ to }) => !(to === '/admin/featured-products' && user?.role !== 'admin'))
+      .map(({ to, label, icon: Icon, end }) => (
+        <li key={to}>
+          <NavLink
+            to={to}
+            end={end}
+            onClick={onItemClick}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive ? cfg.activeLink : `${cfg.inactiveLink} ${cfg.inactiveHover}`
+              }`
+            }
+          >
+            <Icon className="w-5 h-5 shrink-0" />
+            <span>{label}</span>
+            <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-40" />
+          </NavLink>
+        </li>
+      ));
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
@@ -406,7 +410,7 @@ const DashboardLayout: React.FC = () => {
         <aside
           className={`hidden md:flex flex-col ${cfg.sidebarClass} transition-all duration-300 ${
             collapsed ? 'w-16' : 'w-64'
-          } shrink-0`}
+          } shrink-0 sticky top-0 h-screen overflow-hidden`}
         >
           {/* Sidebar header */}
           <div

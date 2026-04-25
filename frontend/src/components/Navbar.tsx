@@ -271,7 +271,7 @@ const Navbar: React.FC = () => {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 ml-auto lg:ml-0">
             {/* Cart — hidden for staff roles */}
             {!isStaffRole && (
               <Link to="/cart" className="relative hover:text-primary-600 transition-colors">

@@ -65,6 +65,8 @@ PODS:
     - ExpoModulesCore
     - GoogleSignIn (~> 9.0)
     - React-Core
+  - ExpoAppleAuthentication (55.0.13):
+    - ExpoModulesCore
   - ExpoAsset (55.0.16):
     - ExpoModulesCore
   - ExpoBlur (55.0.14):
@@ -3120,6 +3122,7 @@ DEPENDENCIES:
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - Expo (from `../node_modules/expo`)
   - "ExpoAdapterGoogleSignIn (from `../node_modules/@react-native-google-signin/google-signin/expo/ios`)"
+  - ExpoAppleAuthentication (from `../node_modules/expo-apple-authentication/ios`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
   - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - "ExpoDomWebView (from `../node_modules/@expo/dom-webview/ios`)"
@@ -3132,8 +3135,8 @@ DEPENDENCIES:
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - ExpoLinking (from `../node_modules/expo-linking/ios`)
   - "ExpoLogBox (from `../node_modules/@expo/log-box`)"
-  - ExpoModulesCore (from `../node_modules/expo/node_modules/expo-modules-core`)
-  - ExpoModulesJSI (from `../node_modules/expo/node_modules/expo-modules-core`)
+  - ExpoModulesCore (from `../node_modules/expo-modules-core`)
+  - ExpoModulesJSI (from `../node_modules/expo-modules-core`)
   - ExpoRouter (from `../node_modules/expo-router/ios`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
   - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
@@ -3260,6 +3263,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo"
   ExpoAdapterGoogleSignIn:
     :path: "../node_modules/@react-native-google-signin/google-signin/expo/ios"
+  ExpoAppleAuthentication:
+    :path: "../node_modules/expo-apple-authentication/ios"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
   ExpoBlur:
@@ -3285,9 +3290,9 @@ EXTERNAL SOURCES:
   ExpoLogBox:
     :path: "../node_modules/@expo/log-box"
   ExpoModulesCore:
-    :path: "../node_modules/expo/node_modules/expo-modules-core"
+    :path: "../node_modules/expo-modules-core"
   ExpoModulesJSI:
-    :path: "../node_modules/expo/node_modules/expo-modules-core"
+    :path: "../node_modules/expo-modules-core"
   ExpoRouter:
     :path: "../node_modules/expo-router/ios"
   ExpoSecureStore:
@@ -3482,6 +3487,7 @@ SPEC CHECKSUMS:
   EXConstants: b2ff8818e17593c8e0a4dc19fa256c804473fed4
   Expo: 313cfeabd334f75d8366e7554886250794666abf
   ExpoAdapterGoogleSignIn: 3332ac2d96d803350f53f84047244b35e2efc994
+  ExpoAppleAuthentication: 9e3a40e8f9d95d23d980956f6dbf0b6c0302940b
   ExpoAsset: e5a93c1082e763fb7b59a0b3a16c38224ba07f8a
   ExpoBlur: 08afa305ca20b1adb0b580fd3b09a38b64ce8804
   ExpoDomWebView: 4937eda7ff9112ddcb8701b52ae4e8e9c2e181b5
