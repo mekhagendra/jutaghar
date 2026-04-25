@@ -230,21 +230,9 @@ const Products: React.FC = () => {
           </p>
         </div>
 
-        {/* Search Bar and Sort */}
+        {/* Filters and Sort */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search for shoes, brands, styles..."
-                value={search}
-                onChange={(e) => updateSearchParams({ search: e.target.value })}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-
+          <div className="flex flex-col md:flex-row gap-4 md:justify-end">
             {/* Filter Toggle (Mobile) */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -258,7 +246,7 @@ const Products: React.FC = () => {
             <select
               value={sort}
               onChange={(e) => updateSearchParams({ sort: e.target.value })}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white md:w-56"
             >
               <option value="">Default (Newest)</option>
               <option value="new">Newest First</option>
