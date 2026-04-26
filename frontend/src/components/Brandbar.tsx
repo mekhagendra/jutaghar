@@ -16,7 +16,7 @@ const Brandbar: React.FC = () => {
   };
 
   return (
-    <div className="bg-white border-b border-gray-100">
+    <div className="hidden lg:block bg-white border-b border-gray-100">
       <div className="container mx-auto px-4 py-3 flex items-center gap-3 sm:gap-6">
         {/* Logo */}
         <Link to="/" onClick={() => window.scrollTo(0, 0)} className="hidden lg:flex flex-shrink-0">

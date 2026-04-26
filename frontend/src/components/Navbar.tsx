@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, ShoppingCart, User, ChevronDown, Package, Heart, Trash2 } from 'lucide-react';
+import { Menu, X, ShoppingCart, User, ChevronDown, Package, Heart, Trash2, Search } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import api from '@/lib/api';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
 import { getAccountActions } from '@/lib/accountActions';
 import logo from '@/assets/logo.png';
@@ -29,8 +29,10 @@ interface Category {
 
 const Navbar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openMobileDropdown, setOpenMobileDropdown] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [menCategories, setMenCategories] = useState<Category[]>([]);
   const [womenCategories, setWomenCategories] = useState<Category[]>([]);
@@ -118,6 +120,14 @@ const Navbar: React.FC = () => {
   const handleMobileNavigation = () => {
     window.scrollTo(0, 0);
     setOpenMobileDropdown(null);
+    setMobileMenuOpen(false);
+  };
+
+  const handleMobileSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    navigate(`/products?search=${encodeURIComponent(q)}`);
     setMobileMenuOpen(false);
   };
 
@@ -225,7 +235,7 @@ const Navbar: React.FC = () => {
   );
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50">
+    <nav className="bg-white shadow-md sticky top-[env(safe-area-inset-top)] z-[90]">
       {/* Main Navbar */}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14">
@@ -237,6 +247,26 @@ const Navbar: React.FC = () => {
               className="h-8 w-auto object-contain hover:opacity-90 transition-opacity"
             />
           </Link>
+
+          {/* Mobile Search (moved from Brandbar) */}
+          <form onSubmit={handleMobileSearch} className="lg:hidden flex-1 min-w-0 mx-2 sm:mx-3">
+            <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search items..."
+                className="flex-1 bg-transparent px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none min-w-0"
+              />
+              <button
+                type="submit"
+                className="flex items-center justify-center px-2.5 py-1.5 text-gray-500 hover:text-primary-600 transition-colors"
+                aria-label="Search"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            </div>
+          </form>
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-1">
@@ -281,7 +311,7 @@ const Navbar: React.FC = () => {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-4 ml-auto lg:ml-0">
+          <div className="flex items-center gap-2 sm:gap-4 ml-auto lg:ml-0">
             {/* Cart — hidden for staff roles */}
             {!isStaffRole && (
               <Link to="/cart" className="relative hover:text-primary-600 transition-colors">
