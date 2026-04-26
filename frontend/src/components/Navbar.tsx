@@ -48,6 +48,7 @@ const Navbar: React.FC = () => {
   const [selectedWishlistIds, setSelectedWishlistIds] = useState<Set<string>>(new Set());
 
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const mobileSearchRef = useRef<HTMLFormElement>(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   // Close mobile menu on route change
@@ -57,6 +58,11 @@ const Navbar: React.FC = () => {
     setWishlistOpen(false);
     setAccountMenuOpen(false);
   }, [location.pathname, location.search]);
+
+  // Ensure mobile search input does not retain stale browser-restored values.
+  useEffect(() => {
+    setSearchQuery('');
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -77,6 +83,23 @@ const Navbar: React.FC = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleOutsideSearchClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (mobileSearchRef.current && !mobileSearchRef.current.contains(target)) {
+        setSearchQuery('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideSearchClick);
+    document.addEventListener('touchstart', handleOutsideSearchClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideSearchClick);
+      document.removeEventListener('touchstart', handleOutsideSearchClick);
     };
   }, []);
 
@@ -235,7 +258,7 @@ const Navbar: React.FC = () => {
   );
 
   return (
-    <nav className="bg-white shadow-md sticky top-[env(safe-area-inset-top)] z-[90]">
+    <nav className="bg-white shadow-md sticky top-0 pt-[calc(env(safe-area-inset-top)+4px)] lg:pt-0 z-[90]">
       {/* Main Navbar */}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14">
@@ -249,13 +272,14 @@ const Navbar: React.FC = () => {
           </Link>
 
           {/* Mobile Search (moved from Brandbar) */}
-          <form onSubmit={handleMobileSearch} className="lg:hidden flex-1 min-w-0 mx-2 sm:mx-3">
+          <form ref={mobileSearchRef} onSubmit={handleMobileSearch} className="lg:hidden flex-1 min-w-0 mx-2 sm:mx-3">
             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-[border-color,box-shadow]">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search items..."
+                autoComplete="off"
                 className="flex-1 bg-transparent px-3 py-1.5 text-base text-gray-800 placeholder-gray-400 focus:outline-none min-w-0"
               />
               <button
