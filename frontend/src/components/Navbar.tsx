@@ -250,13 +250,13 @@ const Navbar: React.FC = () => {
 
           {/* Mobile Search (moved from Brandbar) */}
           <form onSubmit={handleMobileSearch} className="lg:hidden flex-1 min-w-0 mx-2 sm:mx-3">
-            <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all">
+            <div className="flex items-center bg-gray-50 border border-gray-200 rounded-full overflow-hidden focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-[border-color,box-shadow]">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search items..."
-                className="flex-1 bg-transparent px-3 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none min-w-0"
+                className="flex-1 bg-transparent px-3 py-1.5 text-base text-gray-800 placeholder-gray-400 focus:outline-none min-w-0"
               />
               <button
                 type="submit"
