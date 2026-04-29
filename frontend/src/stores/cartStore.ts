@@ -14,7 +14,8 @@ interface CartState {
 
 const getVariantKey = (variant?: ProductVariant | { color?: string; size?: string; sku?: string }) => {
   if (!variant) return '';
-  return `${variant.color || ''}-${variant.size || ''}-${variant.sku || ''}`;
+  const sku = 'sku' in variant ? variant.sku : undefined;
+  return `${variant.color || ''}-${variant.size || ''}-${sku || ''}`;
 };
 
 const getCartItemKey = (item: CartItem) => {

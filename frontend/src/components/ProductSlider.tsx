@@ -35,7 +35,7 @@ const ProductSlider: React.FC<ProductSliderProps> = ({
   const loopProducts = isCircularLoop ? [...products, ...products, ...products] : products;
   const singleSetRef = useRef(0);
 
-  const checkScrollButtons = () => {
+  const checkScrollButtons = React.useCallback(() => {
     if (isCircularLoop) {
       setCanScrollLeft(true);
       setCanScrollRight(true);
@@ -47,9 +47,9 @@ const ProductSlider: React.FC<ProductSliderProps> = ({
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
     }
-  };
+  }, [isCircularLoop]);
 
-  const normalizeLoopPosition = () => {
+  const normalizeLoopPosition = React.useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container || !isCircularLoop) return;
 
@@ -62,7 +62,7 @@ const ProductSlider: React.FC<ProductSliderProps> = ({
     } else if (container.scrollLeft <= singleSetWidth * 0.5) {
       container.scrollLeft += singleSetWidth;
     }
-  };
+  }, [isCircularLoop]);
 
   const getScrollStep = () => {
     const container = scrollContainerRef.current;
@@ -100,7 +100,7 @@ const ProductSlider: React.FC<ProductSliderProps> = ({
     }
     window.addEventListener('resize', checkScrollButtons);
     return () => window.removeEventListener('resize', checkScrollButtons);
-  }, [products, isCircularLoop]);
+  }, [products, isCircularLoop, checkScrollButtons]);
 
   React.useEffect(() => {
     if (!autoScroll || isHovered || products.length <= 1 || !scrollContainerRef.current) {
@@ -133,7 +133,7 @@ const ProductSlider: React.FC<ProductSliderProps> = ({
     rafId = window.requestAnimationFrame(tick);
 
     return () => window.cancelAnimationFrame(rafId);
-  }, [autoScroll, autoScrollInterval, autoScrollSpeed, isHovered, products.length]);
+  }, [autoScroll, autoScrollInterval, autoScrollSpeed, isHovered, products.length, normalizeLoopPosition, checkScrollButtons]);
 
   if (products.length === 0) {
     return null;

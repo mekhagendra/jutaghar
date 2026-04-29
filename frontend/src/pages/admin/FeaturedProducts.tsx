@@ -25,17 +25,6 @@ const FeaturedProducts: React.FC = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
 
-  if (user?.role !== 'admin') {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="card text-center py-12">
-          <h1 className="text-2xl font-bold text-gray-900">Access denied</h1>
-          <p className="text-gray-600 mt-2">Only admins can manage featured products.</p>
-        </div>
-      </div>
-    );
-  }
-
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['admin-featured-products', search],
     queryFn: async () => {
@@ -47,7 +36,7 @@ const FeaturedProducts: React.FC = () => {
     },
   });
 
-  const products: AdminProduct[] = data?.products || [];
+  const products: AdminProduct[] = useMemo(() => data?.products ?? [], [data]);
 
   const featuredCount = useMemo(
     () => products.filter((product) => product.isFeatured || product.tags?.includes('featured')).length,
@@ -68,6 +57,17 @@ const FeaturedProducts: React.FC = () => {
       toast.error('Failed to update featured status');
     },
   });
+
+  if (user?.role !== 'admin') {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="card text-center py-12">
+          <h1 className="text-2xl font-bold text-gray-900">Access denied</h1>
+          <p className="text-gray-600 mt-2">Only admins can manage featured products.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
