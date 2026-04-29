@@ -1,5 +1,5 @@
 import api, { API_BASE_URL } from '@/api';
-import { addToCart } from '@/features/checkout';
+import { isInWishlist, subscribeWishlist, toggleWishlist } from '@/features/catalog';
 import Header from '@/shared/components/Header';
 import type { Brand, Category, Product, ProductsResponse } from '@/types';
 import { StatusBar } from 'expo-status-bar';
@@ -140,6 +140,7 @@ export default function ProductsScreen({
   initialVendor,
   initialSearch,
 }: ProductsScreenProps) {
+  const [, setWishlistTick] = useState(0);
   const { width } = useWindowDimensions();
   const listRef = useRef<FlatList<Product>>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -207,6 +208,13 @@ export default function ProductsScreen({
   }, [fetchFilters]);
 
   useEffect(() => {
+    const unsubscribe = subscribeWishlist(() => {
+      setWishlistTick((tick) => tick + 1);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
@@ -231,11 +239,6 @@ export default function ProductsScreen({
       return { price: product.salePrice, originalPrice: product.price, onSale: true };
     }
     return { price: product.price, originalPrice: null, onSale: false };
-  };
-
-  const handleAddToCart = (product: Product) => {
-    addToCart(product, 1);
-    Alert.alert('Added to Cart', `${product.name} has been added to your cart.`);
   };
 
   const clearAllFilters = () => {
@@ -319,6 +322,15 @@ export default function ProductsScreen({
               <Text style={styles.saleBadgeText}>SALE</Text>
             </View>
           )}
+          <TouchableOpacity
+            style={styles.wishlistButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              void toggleWishlist(item);
+            }}
+          >
+            <Text style={styles.wishlistIcon}>{isInWishlist(item._id) ? '♥' : '♡'}</Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
@@ -333,15 +345,6 @@ export default function ProductsScreen({
               {'★'.repeat(Math.round(item.rating.average))} ({item.rating.count})
             </Text>
           )}
-          <TouchableOpacity
-            style={[styles.addToCartButton, item.stock <= 0 && styles.outOfStockButton]}
-            onPress={() => item.stock > 0 && handleAddToCart(item)}
-            disabled={item.stock <= 0}
-          >
-            <Text style={styles.addToCartText}>
-              {item.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -589,15 +592,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
   },
   saleBadgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  wishlistButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 2,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wishlistIcon: { fontSize: 16, color: '#e74c3c' },
   productInfo: { padding: 10 },
   productName: { fontSize: 14, fontWeight: '600', color: '#2c3e50', marginBottom: 4 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   productPrice: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e' },
   originalPrice: { fontSize: 13, color: '#95a5a6', textDecorationLine: 'line-through' },
   ratingText: { fontSize: 12, color: '#f39c12', marginBottom: 6 },
-  addToCartButton: { backgroundColor: '#3498db', borderRadius: 8, padding: 9, alignItems: 'center' },
-  outOfStockButton: { backgroundColor: '#bdc3c7' },
-  addToCartText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   emptyContainer: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },

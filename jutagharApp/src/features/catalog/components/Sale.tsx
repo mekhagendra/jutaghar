@@ -1,4 +1,5 @@
 import api, { API_BASE_URL } from '@/api';
+import { isInWishlist, subscribeWishlist, toggleWishlist } from '@/stores/wishlistStore';
 import type { Product } from '@/types';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
@@ -17,6 +18,7 @@ export default function Sale({ onViewProduct }: SaleProps) {
   const { width } = useWindowDimensions();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [, setWishlistTick] = useState(0);
 
   const numColumns = width > 992 ? 6 : width > 640 ? 3 : 2;
   const cardWidth = (width - 28 - (numColumns - 1) * 10) / numColumns;
@@ -33,6 +35,13 @@ export default function Sale({ onViewProduct }: SaleProps) {
       }
     };
     fetchSaleProducts();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeWishlist(() => {
+      setWishlistTick((tick) => tick + 1);
+    });
+    return unsubscribe;
   }, []);
 
   if (loading) {
@@ -81,6 +90,15 @@ export default function Sale({ onViewProduct }: SaleProps) {
                     <Text style={styles.discountText}>-{discount}%</Text>
                   </View>
                 )}
+                <TouchableOpacity
+                  style={styles.wishlistButton}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    void toggleWishlist(item);
+                  }}
+                >
+                  <Text style={styles.wishlistIcon}>{isInWishlist(item._id) ? '♥' : '♡'}</Text>
+                </TouchableOpacity>
               </View>
               <View style={styles.info}>
                 <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
@@ -177,6 +195,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  wishlistButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 2,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wishlistIcon: {
+    fontSize: 16,
+    color: '#e74c3c',
   },
   info: {
     padding: 10,

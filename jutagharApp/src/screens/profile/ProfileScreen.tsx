@@ -54,7 +54,7 @@ export default function ProfileScreen({ userData, onLogout, onViewOrders, resetT
     setShowAccountInfo(false);
     setSellerImage(user?.sellerImage || '');
     setSellerImageUri('');
-  }, [resetToken]);
+  }, [resetToken, user?.sellerImage]);
 
   const pickSellerImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -473,6 +473,26 @@ const styles = StyleSheet.create({
   },
   disabledText: { fontSize: 15, color: '#999' },
   hint: { fontSize: 11, color: '#aaa', marginTop: 4 },
+  pickImageButton: {
+    borderWidth: 1,
+    borderColor: '#d7e3f4',
+    backgroundColor: '#f5f9ff',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  pickImageText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3498db',
+  },
+  previewImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+    marginTop: 10,
+    backgroundColor: '#eef2f6',
+  },
   saveButton: {
     backgroundColor: '#3498db', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4,
   },

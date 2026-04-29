@@ -82,7 +82,9 @@ const Cart: React.FC = () => {
         <div className="lg:col-span-2 space-y-4">
           {items.map((item) => {
             const itemKey = getCartItemKey(item);
-            const itemPrice = item.selectedVariant?.price || item.product.price;
+            const itemPrice = item.product.onSale && item.product.salePrice
+              ? item.product.salePrice
+              : item.product.price;
             const variantKey = item.selectedVariant 
               ? `${item.selectedVariant.color || ''}-${item.selectedVariant.size || ''}-${item.selectedVariant.sku || ''}`
               : undefined;

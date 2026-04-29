@@ -10,6 +10,7 @@ const createProductValidation = [
   body('name').trim().notEmpty(),
   body('description').trim().notEmpty(),
   body('price').isFloat({ min: 0 }).withMessage('Price is required and must be greater than 0'),
+  body('sku').optional({ checkFalsy: true }).trim(),
   body('category').trim().notEmpty()
 ];
 

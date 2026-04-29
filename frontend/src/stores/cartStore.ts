@@ -32,8 +32,8 @@ export const useCartStore = create<CartState>()(
           const selectedVariant = variant ? {
             color: variant.color,
             size: variant.size,
-            sku: variant.sku,
-            price: variant.price
+            sku: product.sku,
+            image: variant.image,
           } : undefined;
 
           const newItem: CartItem = { product, quantity, selectedVariant };
@@ -92,13 +92,15 @@ export const useCartStore = create<CartState>()(
 
       getTotalPrice: () => {
         return get().items.reduce((total, item) => {
-          const price = item.selectedVariant?.price || item.product.price;
+          const price = item.product.onSale && item.product.salePrice
+            ? item.product.salePrice
+            : item.product.price;
           return total + price * item.quantity;
         }, 0);
       },
     }),
     {
-      name: 'cart-storage',
+      name: 'cart-storage-v3',
     }
   )
 );

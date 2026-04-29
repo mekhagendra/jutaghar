@@ -57,7 +57,7 @@ describe('cartStore', () => {
 
   it('merges same product with same variant key', async () => {
     const product = makeProduct('p2', { price: 900 });
-    const variant = { color: 'Black', size: '42', sku: 'SKU-42', price: 950 };
+    const variant = { color: 'Black', size: '42', sku: 'SKU-42' };
 
     await addToCart(product, 1, variant);
     await addToCart(product, 2, variant);
@@ -65,13 +65,13 @@ describe('cartStore', () => {
     const items = getCartItems();
     expect(items).toHaveLength(1);
     expect(items[0].quantity).toBe(3);
-    expect(getTotalPrice()).toBe(2850);
+    expect(getTotalPrice()).toBe(2700);
   });
 
   it('keeps separate lines for different variants and removes by variant key', async () => {
     const product = makeProduct('p3');
-    const red = { color: 'Red', size: '40', sku: 'R40', price: 1000 };
-    const blue = { color: 'Blue', size: '40', sku: 'B40', price: 1000 };
+    const red = { color: 'Red', size: '40', sku: 'R40' };
+    const blue = { color: 'Blue', size: '40', sku: 'B40' };
 
     await addToCart(product, 1, red);
     await addToCart(product, 1, blue);
@@ -93,7 +93,7 @@ describe('cartStore', () => {
     expect(getTotalItems()).toBe(0);
   });
 
-  it('uses sale price when variant price is not provided', async () => {
+  it('uses sale price when available', async () => {
     const product = makeProduct('p5', {
       price: 2000,
       salePrice: 1500,

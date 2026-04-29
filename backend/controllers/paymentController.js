@@ -121,7 +121,6 @@ export const settleOrderFromGatewayResult = async ({
           const variantMatch = { quantity: { $gte: item.quantity } };
           if (item.variant.color) variantMatch.color = item.variant.color;
           if (item.variant.size) variantMatch.size = item.variant.size;
-          if (item.variant.sku) variantMatch.sku = item.variant.sku;
 
           updatedProduct = await Product.findOneAndUpdate(
             {
@@ -260,7 +259,7 @@ export const initiateOrder = async (req, res) => {
         });
       }
 
-      const itemPrice = selectedVariant?.price || product.price;
+      const itemPrice = product.price;
       const itemTotal = itemPrice * item.quantity;
       subtotal += itemTotal;
 

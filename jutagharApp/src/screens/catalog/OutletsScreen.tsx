@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -31,7 +32,11 @@ interface OutletsApiResponse {
   };
 }
 
-export default function OutletsScreen() {
+interface OutletsScreenProps {
+  onViewProducts?: (options?: { vendor?: string }) => void;
+}
+
+export default function OutletsScreen({ onViewProducts }: OutletsScreenProps) {
   const { width } = useWindowDimensions();
   const [outlets, setOutlets] = useState<OutletUser[]>([]);
   const [query, setQuery] = useState('');
@@ -131,7 +136,11 @@ export default function OutletsScreen() {
         contentContainerStyle={filteredOutlets.length === 0 ? styles.emptyList : styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3498db']} />}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.85}
+            onPress={() => onViewProducts?.({ vendor: item._id })}
+          >
             <View style={[styles.mediaContainer, { width: mediaWidth }]}>
               {item.sellerImage ? (
                 <Image source={{ uri: getImageUrl(item.sellerImage) || undefined }} style={styles.sellerImage} resizeMode="cover" />
@@ -155,7 +164,7 @@ export default function OutletsScreen() {
                 )}
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>

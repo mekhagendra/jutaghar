@@ -1,19 +1,16 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ShoppingCart } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { Product } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { useCartStore } from '@/stores/cartStore';
 import { useWishlistStore } from '@/stores/wishlistStore';
 import { useAuthStore } from '@/stores/authStore';
 
 interface ProductCardProps {
   product: Product;
-  onAddToCart?: (product: Product) => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
-  const { addItem } = useCartStore();
+const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { toggleItem, isInWishlist } = useWishlistStore();
   const { user, isAuthenticated } = useAuthStore();
   const isStaffRole = isAuthenticated && (user?.role === 'admin' || user?.role === 'seller' || user?.role === 'manager');
@@ -31,19 +28,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
   const salePercent = hasSale
     ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
     : 0;
-
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    addItem(product, 1);
-    
-    if (onAddToCart) {
-      onAddToCart(product);
-    }
-  };
-
   // Check if product has special tags
   const isNew = product.tags?.includes('new-arrival');
   const isBestSeller = product.tags?.includes('best-seller');
@@ -107,13 +91,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
 
         {/* Quick Actions — hidden for staff roles */}
         {!isStaffRole && (
-          <div
-            className={`absolute top-2 right-2 flex flex-col gap-2 transition-all duration-300 ${
-              isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
-            }`}
-          >
+          <div className="absolute top-2 right-2 flex flex-col gap-2">
             <button
-              className="p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition"
+              className="p-1 bg-transparent transition"
               aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
               onClick={(e) => {
                 e.preventDefault();
@@ -123,19 +103,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
             >
               <Heart
                 className={`w-4 h-4 transition-colors ${
-                  wishlisted ? 'fill-red-500 text-red-500' : 'text-gray-700 hover:text-red-500'
+                  wishlisted ? 'fill-red-500 text-red-500' : 'text-red-500'
                 }`}
               />
             </button>
-            {!isOutOfStock && (
-              <button
-                className="p-2 bg-white rounded-full shadow-md hover:bg-primary-50 transition"
-                aria-label="Add to cart"
-                onClick={handleAddToCart}
-              >
-                <ShoppingCart className="w-4 h-4 text-gray-700 hover:text-primary-600" />
-              </button>
-            )}
           </div>
         )}
 

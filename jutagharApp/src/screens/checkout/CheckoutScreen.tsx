@@ -382,7 +382,9 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📋 Order Summary</Text>
           {items.map((item, i) => {
-            const price = item.selectedVariant?.price || item.product.salePrice || item.product.price;
+            const price = item.product.onSale && item.product.salePrice
+              ? item.product.salePrice
+              : item.product.price;
             return (
               <View key={i} style={styles.summaryItem}>
                 <View style={{ flex: 1 }}>

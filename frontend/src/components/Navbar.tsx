@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
 import { getAccountActions } from '@/lib/accountActions';
 import logo from '@/assets/logo.png';
+import { toast } from 'react-hot-toast';
 import {
   ACCOUNT_DROPDOWN_DANGER_ITEM_CLASS,
   ACCOUNT_DROPDOWN_ITEM_CLASS,
@@ -132,7 +133,14 @@ const Navbar: React.FC = () => {
 
   const handleAddSelectedToCart = () => {
     const toAdd = wishlistItems.filter((p) => selectedWishlistIds.has(p._id) && p.stock > 0);
-    toAdd.forEach((p) => {
+    const variantProducts = toAdd.filter((p) => p.variants && p.variants.length > 0);
+    const simpleProducts = toAdd.filter((p) => !p.variants || p.variants.length === 0);
+
+    if (variantProducts.length > 0) {
+      toast('Some items require size/color selection. Open product detail to add them.');
+    }
+
+    simpleProducts.forEach((p) => {
       addToCart(p, 1);
       removeFromWishlist(p._id);
     });

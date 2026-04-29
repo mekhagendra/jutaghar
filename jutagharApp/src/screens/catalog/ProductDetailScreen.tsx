@@ -1,14 +1,16 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import api, { API_BASE_URL } from '@/api';
@@ -25,6 +27,7 @@ interface ProductDetailScreenProps {
 }
 
 export default function ProductDetailScreen({ product: initialProduct, onBack, onViewCart }: ProductDetailScreenProps) {
+  const imageScrollRef = useRef<ScrollView>(null);
   const [product, setProduct] = useState<Product>(initialProduct);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -32,6 +35,7 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [wishlisted, setWishlisted] = useState(isInWishlist(initialProduct._id));
+  const [showCartNotice, setShowCartNotice] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeWishlist(() => {
@@ -64,15 +68,30 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
 
   const getAllImages = () => {
     const images: string[] = [];
+    const variantImage = getSelectedVariantData()?.image;
+    if (variantImage) images.push(variantImage);
     if (product.mainImage) images.push(product.mainImage);
     if (product.images) images.push(...product.images.filter(img => img !== product.mainImage));
-    return images;
+    return Array.from(new Set(images));
   };
 
   const getAvailableColors = () => {
     if (!product.variants) return [];
     const colors = [...new Set(product.variants.filter(v => v.color).map(v => v.color!))];
     return colors;
+  };
+
+  const getColorOptions = () => {
+    const colors = getAvailableColors();
+    return colors.map((color) => {
+      const variantWithImage = product.variants?.find((v) => v.color === color && v.image);
+      const fallbackVariant = product.variants?.find((v) => v.color === color);
+
+      return {
+        color,
+        image: variantWithImage?.image || fallbackVariant?.image,
+      };
+    });
   };
 
   const getAvailableSizes = () => {
@@ -94,8 +113,6 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
   };
 
   const getPrice = () => {
-    const variant = getSelectedVariantData();
-    if (variant?.price) return variant.price;
     if (product.onSale && product.salePrice) return product.salePrice;
     return product.price;
   };
@@ -114,12 +131,13 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
     }
 
     if (product.variants && product.variants.length > 0) {
-      if (getAvailableColors().length > 0 && !selectedColor) {
-        Alert.alert('Select Color', 'Please select a color before adding to cart.');
-        return;
-      }
-      if (getAvailableSizes().length > 0 && !selectedSize) {
-        Alert.alert('Select Size', 'Please select a size before adding to cart.');
+      const needsColor = getAvailableColors().length > 0;
+      const needsSize = getAvailableSizes().length > 0;
+      if ((needsColor && !selectedColor) || (needsSize && !selectedSize)) {
+        const missing: string[] = [];
+        if (needsColor && !selectedColor) missing.push('color');
+        if (needsSize && !selectedSize) missing.push('size');
+        Alert.alert('Select Variant', `Please select ${missing.join(' and ')} before adding to cart.`);
         return;
       }
     }
@@ -128,24 +146,26 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
     addToCart(product, quantity, variant ? {
       color: variant.color,
       size: variant.size,
-      sku: variant.sku,
-      price: variant.price,
+      sku: product.sku,
       image: variant.image,
     } : undefined);
 
-    Alert.alert('Added to Cart', `${product.name} added to your cart!`, [
-      { text: 'Continue Shopping', style: 'cancel' },
-      { text: 'View Cart', onPress: onViewCart },
-    ]);
+    setShowCartNotice(true);
   };
 
   const images = getAllImages();
   const colors = getAvailableColors();
+  const colorOptions = getColorOptions();
   const sizes = getAvailableSizes();
   const price = getPrice();
   const stock = getStock();
   const categoryName = typeof product.category === 'string' ? product.category : product.category?.name || '';
   const brandName = typeof product.brand === 'string' ? product.brand : product.brand?.name || '';
+
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    imageScrollRef.current?.scrollTo({ x: 0, animated: false });
+  }, [selectedColor, selectedSize]);
 
   if (isLoading) {
     return (
@@ -160,7 +180,7 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
       <StatusBar style="light" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: '#7b3306' }]}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
@@ -174,6 +194,7 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
         {/* Product Images */}
         <View style={styles.imageSection}>
           <ScrollView
+            ref={imageScrollRef}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
@@ -241,17 +262,31 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
           {colors.length > 0 && (
             <View style={styles.variantSection}>
               <Text style={styles.variantLabel}>Color</Text>
-              <View style={styles.variantOptions}>
-                {colors.map((color) => (
+              <View style={styles.colorSwatchGrid}>
+                {colorOptions.map(({ color, image }) => (
                   <TouchableOpacity
                     key={color}
-                    style={[styles.variantChip, selectedColor === color && styles.variantChipActive]}
+                    style={[styles.colorSwatchCard, selectedColor === color && styles.colorSwatchCardActive]}
                     onPress={() => {
                       setSelectedColor(color);
                       setSelectedSize(null); // Reset size when color changes
                     }}
+                    activeOpacity={0.9}
                   >
-                    <Text style={[styles.variantChipText, selectedColor === color && styles.variantChipTextActive]}>
+                    <View style={styles.colorSwatchImageFrame}>
+                      {image ? (
+                        <Image
+                          source={{ uri: getImageUrl(image) || undefined }}
+                          style={styles.colorSwatchImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.colorSwatchPlaceholder}>
+                          <Text style={styles.colorSwatchPlaceholderText}>{color.charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.colorSwatchText, selectedColor === color && styles.colorSwatchTextActive]} numberOfLines={1}>
                       {color}
                     </Text>
                   </TouchableOpacity>
@@ -345,6 +380,43 @@ export default function ProductDetailScreen({ product: initialProduct, onBack, o
           </Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showCartNotice}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCartNotice(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowCartNotice(false)}>
+          <View style={styles.cartNoticeOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.cartNoticeCard}>
+                <Text style={styles.cartNoticeTitle}>Added to Cart</Text>
+                <Text style={styles.cartNoticeMessage} numberOfLines={2}>
+                  {product.name} added to your cart.
+                </Text>
+                <View style={styles.cartNoticeActions}>
+                  <TouchableOpacity
+                    style={styles.cartNoticeSecondaryBtn}
+                    onPress={() => setShowCartNotice(false)}
+                  >
+                    <Text style={styles.cartNoticeSecondaryText}>Continue</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cartNoticePrimaryBtn}
+                    onPress={() => {
+                      setShowCartNotice(false);
+                      onViewCart?.();
+                    }}
+                  >
+                    <Text style={styles.cartNoticePrimaryText}>View Cart</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -366,7 +438,6 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 14,
     paddingHorizontal: 16,
-    backgroundColor: '#1a1a2e',
   },
   backButton: {
     width: 60,
@@ -500,13 +571,76 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  colorSwatchGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  colorSwatchCard: {
+    width: 96,
+    padding: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#dfe4ea',
+    backgroundColor: '#fff',
+  },
+  colorSwatchCardActive: {
+    borderColor: '#3498db',
+    backgroundColor: '#eef7ff',
+    shadowColor: '#3498db',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  colorSwatchImageFrame: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#edf1f4',
+    marginBottom: 6,
+  },
+  colorSwatchImage: {
+    width: '100%',
+    height: '100%',
+  },
+  colorSwatchPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e8edf2',
+  },
+  colorSwatchPlaceholderText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#7f8c8d',
+  },
+  colorSwatchText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2c3e50',
+    textAlign: 'center',
+  },
+  colorSwatchTextActive: {
+    color: '#1d6fa5',
+  },
   variantChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
     backgroundColor: '#fff',
+  },
+  variantChipImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#ecf0f1',
   },
   variantChipActive: {
     backgroundColor: '#3498db',
@@ -645,5 +779,66 @@ const styles = StyleSheet.create({
   },
   wishlistIcon: {
     fontSize: 22,
+  },
+  cartNoticeOverlay: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 88,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+  },
+  cartNoticeCard: {
+    width: '100%',
+    maxWidth: 460,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#e7edf3',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  cartNoticeTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  cartNoticeMessage: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#4b5563',
+  },
+  cartNoticeActions: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  cartNoticeSecondaryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+  },
+  cartNoticeSecondaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  cartNoticePrimaryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#3498db',
+  },
+  cartNoticePrimaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

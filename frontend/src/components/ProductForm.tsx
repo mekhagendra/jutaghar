@@ -6,6 +6,7 @@ import api from '@/lib/api';
 export interface ProductFormData {
   name: string;
   description: string;
+  sku: string;
   price: number;
   category: string;
   brand: string;
@@ -17,8 +18,6 @@ export interface ProductFormData {
   variants?: Array<{
     color: string;
     size: string;
-    sku: string;
-    price: number;
     quantity: number;
     status?: string;
     image?: string;
@@ -29,6 +28,7 @@ export interface ProductFormData {
 interface ProductInitialData {
   name?: string;
   description?: string;
+  sku?: string;
   price?: number;
   category?: string | { _id: string; name: string };
   brand?: string | { _id: string; name: string };
@@ -40,8 +40,6 @@ interface ProductInitialData {
   variants?: Array<{
     color: string;
     size: string;
-    sku: string;
-    price: number;
     quantity: number;
     status?: string;
     image?: string;
@@ -87,6 +85,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const [formData, setFormData] = useState<ProductFormData>({
     name: initialData?.name || '',
     description: initialData?.description || '',
+    sku: initialData?.sku || '',
     price: initialData?.price || 0,
     category: initialData?.category 
       ? (typeof initialData.category === 'object' && 'name' in initialData.category 
@@ -162,11 +161,30 @@ const ProductForm: React.FC<ProductFormProps> = ({
     }));
   };
 
+  const handleVariantImageChange = (index: number, file?: File) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setFormData(prev => {
+        const newVariants = [...(prev.variants || [])];
+        newVariants[index] = {
+          ...newVariants[index],
+          image: result,
+        };
+        return { ...prev, variants: newVariants };
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof ProductFormData, string>> = {};
 
     if (!formData.name.trim()) newErrors.name = 'Product name is required';
     if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (!formData.sku.trim()) newErrors.sku = 'SKU is required';
     if (!formData.price || formData.price <= 0) newErrors.price = 'Price must be greater than 0';
     if (!formData.category) newErrors.category = 'Category is required';
     if (!formData.brand.trim()) newErrors.brand = 'Brand is required';
@@ -224,6 +242,21 @@ const ProductForm: React.FC<ProductFormProps> = ({
               placeholder="Enter product description"
             />
             {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Product SKU *
+            </label>
+            <input
+              type="text"
+              name="sku"
+              value={formData.sku}
+              onChange={handleChange}
+              className={`input ${errors.sku ? 'border-red-500' : ''}`}
+              placeholder="e.g. JT-SNEAKER-001"
+            />
+            {errors.sku && <p className="text-red-500 text-sm mt-1">{errors.sku}</p>}
           </div>
 
           <div>
@@ -410,8 +443,46 @@ const ProductForm: React.FC<ProductFormProps> = ({
         <div className="space-y-3">
           {formData.variants && formData.variants.length > 0 ? (
             formData.variants.map((variant, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-3">
+              <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="w-28 shrink-0">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Variant Image
+                    </label>
+                    {variant.image ? (
+                      <div className="relative">
+                        <img
+                          src={variant.image}
+                          alt={`${variant.color || 'Variant'} preview`}
+                          className="w-28 aspect-square object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newVariants = [...formData.variants!];
+                            newVariants[index].image = '';
+                            setFormData(prev => ({ ...prev, variants: newVariants }));
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="w-28 aspect-square flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-500 transition">
+                        <Upload className="w-5 h-5 text-gray-400" />
+                        <span className="text-[11px] text-gray-500 mt-1">Upload</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleVariantImageChange(index, e.target.files?.[0])}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Size *
@@ -447,42 +518,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
                       }}
                       className="input text-sm"
                       placeholder="e.g. Black"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      SKU
-                    </label>
-                    <input
-                      type="text"
-                      value={variant.sku}
-                      onChange={(e) => {
-                        const newVariants = [...formData.variants!];
-                        newVariants[index].sku = e.target.value;
-                        setFormData(prev => ({ ...prev, variants: newVariants }));
-                      }}
-                      className="input text-sm"
-                      placeholder="e.g. SH-BLK-10"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Price (NPR) *
-                    </label>
-                    <input
-                      type="number"
-                      value={variant.price || ''}
-                      onChange={(e) => {
-                        const newVariants = [...formData.variants!];
-                        newVariants[index].price = e.target.value === '' ? 0 : Number(e.target.value);
-                        setFormData(prev => ({ ...prev, variants: newVariants }));
-                      }}
-                      className="input text-sm"
-                      min="0"
-                      step="0.01"
                       required
                     />
                   </div>
@@ -526,18 +561,19 @@ const ProductForm: React.FC<ProductFormProps> = ({
                     </select>
                   </div>
                 </div>
-                
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newVariants = formData.variants!.filter((_, i) => i !== index);
-                    setFormData(prev => ({ ...prev, variants: newVariants }));
-                  }}
-                  className="text-red-600 hover:text-red-800 p-2"
-                  title="Remove variant"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newVariants = formData.variants!.filter((_, i) => i !== index);
+                      setFormData(prev => ({ ...prev, variants: newVariants }));
+                    }}
+                    className="text-red-600 hover:text-red-800 p-2"
+                    title="Remove variant"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             ))
           ) : (
@@ -552,8 +588,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
             const newVariant = {
               color: '',
               size: '',
-              sku: '',
-              price: formData.price,
               quantity: 0,
               status: 'active'
             };

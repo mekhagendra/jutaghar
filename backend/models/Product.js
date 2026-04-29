@@ -15,6 +15,11 @@ const productSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  sku: {
+    type: String,
+    trim: true,
+    uppercase: true,
+  },
   compareAtPrice: {
     type: Number,
     min: 0
@@ -58,8 +63,6 @@ const productSchema = new mongoose.Schema({
   variants: [{
     color: String,
     size: String,
-    sku: String,
-    price: Number,
     quantity: {
       type: Number,
       default: 0,
@@ -117,6 +120,7 @@ const productSchema = new mongoose.Schema({
 // Indexes
 productSchema.index({ vendor: 1, status: 1 });
 productSchema.index({ category: 1 });
+productSchema.index({ vendor: 1, sku: 1 }, { unique: true, sparse: true });
 productSchema.index({ name: 'text', description: 'text', tags: 'text' });
 
 // Virtual field to calculate total stock from variants
@@ -140,6 +144,10 @@ productSchema.pre('save', function(next) {
   if (this.variants && this.variants.length > 0) {
     // If variants exist, calculate stock as sum of variant quantities
     this.stock = this.variants.reduce((sum, variant) => sum + (variant.quantity || 0), 0);
+  }
+
+  if (!this.onSale) {
+    this.salePrice = undefined;
   }
   
   // Update status based on stock

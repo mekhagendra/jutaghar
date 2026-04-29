@@ -1,4 +1,5 @@
 import { getTotalItems, subscribeCart } from '@/features/checkout';
+import { getWishlistCount, subscribeWishlist } from '@/features/catalog';
 import Feather from '@expo/vector-icons/Feather';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -23,13 +24,23 @@ const TABS: { key: TabName; label: string; icon: keyof typeof Feather.glyphMap }
 
 export default function Footer({ activeTab, onNavigate, isLoggedIn }: FooterProps) {
   const [cartCount, setCartCount] = useState(getTotalItems());
+  const [wishlistCount, setWishlistCount] = useState(getWishlistCount());
 
   useEffect(() => {
-    const unsubscribe = subscribeCart(() => {
+    const unsubscribeCart = subscribeCart(() => {
       setCartCount(getTotalItems());
     });
+    const unsubscribeWishlist = subscribeWishlist(() => {
+      setWishlistCount(getWishlistCount());
+    });
+
     setCartCount(getTotalItems());
-    return unsubscribe;
+    setWishlistCount(getWishlistCount());
+
+    return () => {
+      unsubscribeCart();
+      unsubscribeWishlist();
+    };
   }, []);
 
   return (
@@ -55,6 +66,13 @@ export default function Footer({ activeTab, onNavigate, isLoggedIn }: FooterProp
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
                     {cartCount > 99 ? '99+' : cartCount}
+                  </Text>
+                </View>
+              )}
+              {tab.key === 'wishlist' && wishlistCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {wishlistCount > 99 ? '99+' : wishlistCount}
                   </Text>
                 </View>
               )}

@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '@/api';
+import { isInWishlist, subscribeWishlist, toggleWishlist } from '@/stores/wishlistStore';
 import type { Product } from '@/types';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 interface TrendingProps {
@@ -22,7 +23,14 @@ const getProductPrice = (product: Product) => {
 };
 
 export default function Trending({ products, onViewProduct }: TrendingProps) {
+  const [, setWishlistTick] = useState(0);
   const { width } = useWindowDimensions();
+  useEffect(() => {
+    const unsubscribe = subscribeWishlist(() => {
+      setWishlistTick((tick) => tick + 1);
+    });
+    return unsubscribe;
+  }, []);
   if (products.length === 0) return null;
 
   const trendingItems = products.slice(0, 6);
@@ -62,6 +70,15 @@ export default function Trending({ products, onViewProduct }: TrendingProps) {
                     <Text style={styles.saleBadgeText}>SALE</Text>
                   </View>
                 )}
+                <TouchableOpacity
+                  style={styles.wishlistButton}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    void toggleWishlist(item);
+                  }}
+                >
+                  <Text style={styles.wishlistIcon}>{isInWishlist(item._id) ? '♥' : '♡'}</Text>
+                </TouchableOpacity>
               </View>
               <View style={styles.info}>
                 <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
@@ -147,6 +164,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: 'bold',
+  },
+  wishlistButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 2,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wishlistIcon: {
+    fontSize: 16,
+    color: '#e74c3c',
   },
   info: {
     padding: 10,

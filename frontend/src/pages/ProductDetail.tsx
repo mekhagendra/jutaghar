@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -102,6 +102,22 @@ const ProductDetail: React.FC = () => {
     return [...new Set(product.variants.map((v: ProductVariant) => v.color).filter(Boolean))] as string[];
   }, [product]);
 
+  const colorOptions = useMemo(() => {
+    if (!product?.variants || product.variants.length === 0) return [];
+
+    return availableColors.map((color) => {
+      const variantWithImage = product.variants.find(
+        (v: ProductVariant) => v.color === color && v.image
+      );
+      const fallbackVariant = product.variants.find((v: ProductVariant) => v.color === color);
+
+      return {
+        color,
+        image: variantWithImage?.image || fallbackVariant?.image || '',
+      };
+    });
+  }, [availableColors, product]);
+
   const availableSizes = useMemo(() => {
     if (!product?.variants || product.variants.length === 0) return [];
     const sizes = [...new Set(
@@ -130,6 +146,22 @@ const ProductDetail: React.FC = () => {
     }
     return product?.stock || 0;
   }, [selectedVariant, product]);
+
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+
+    const images = [selectedVariant?.image, product.mainImage, ...(product.images || [])].filter(Boolean) as string[];
+    return Array.from(new Set(images));
+  }, [product, selectedVariant]);
+
+  useEffect(() => {
+    if (selectedVariant?.image) {
+      setActiveImage(selectedVariant.image);
+      return;
+    }
+
+    setActiveImage('');
+  }, [selectedVariant?.image]);
 
   const handleAddToCart = () => {
     setError('');
@@ -181,7 +213,8 @@ const ProductDetail: React.FC = () => {
     );
   }
 
-  const displayPrice = selectedVariant?.price || product.price;
+  const basePrice = product.price;
+  const displayPrice = product.onSale && product.salePrice ? product.salePrice : product.price;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -190,8 +223,7 @@ const ProductDetail: React.FC = () => {
         <div>
           <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-4">
             {(() => {
-              const allImages = [product.mainImage, ...(product.images || [])].filter(Boolean);
-              const displayImage = activeImage || allImages[0];
+              const displayImage = activeImage || galleryImages[0];
               return displayImage ? (
                 <img
                   src={displayImage}
@@ -207,16 +239,15 @@ const ProductDetail: React.FC = () => {
           </div>
           {/* Thumbnail gallery */}
           {(() => {
-            const allImages = [product.mainImage, ...(product.images || [])].filter(Boolean);
-            if (allImages.length <= 1) return null;
+            if (galleryImages.length <= 1) return null;
             return (
               <div className="grid grid-cols-5 gap-2">
-                {allImages.map((img: string, idx: number) => (
+                {galleryImages.map((img: string, idx: number) => (
                   <button
                     key={idx}
                     onClick={() => setActiveImage(img)}
                     className={`aspect-square rounded-lg overflow-hidden border-2 transition ${
-                      (activeImage || allImages[0]) === img
+                      (activeImage || galleryImages[0]) === img
                         ? 'border-primary-600'
                         : 'border-gray-200 hover:border-gray-400'
                     }`}
@@ -251,10 +282,10 @@ const ProductDetail: React.FC = () => {
                     {formatCurrency(product.salePrice)}
                   </span>
                   <span className="text-xl text-gray-500 line-through">
-                    {formatCurrency(displayPrice)}
+                    {formatCurrency(basePrice)}
                   </span>
                   <span className="text-sm font-semibold text-white bg-red-500 px-2 py-0.5 rounded">
-                    {Math.round(((displayPrice - product.salePrice) / displayPrice) * 100)}% OFF
+                    {Math.round(((basePrice - product.salePrice) / basePrice) * 100)}% OFF
                   </span>
                 </>
               ) : (
@@ -287,20 +318,27 @@ const ProductDetail: React.FC = () => {
                     Color {selectedColor && <span className="text-gray-500">- {selectedColor}</span>}
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {availableColors.map((color) => (
+                    {colorOptions.map(({ color, image }) => (
                       <button
                         key={color}
                         onClick={() => {
                           setSelectedColor(color);
                           setSelectedSize('');
                         }}
-                        className={`px-4 py-2 border-2 rounded-lg transition ${
+                        className={`flex items-center gap-3 px-3 py-2 border-2 rounded-lg transition ${
                           selectedColor === color
                             ? 'border-primary-600 bg-primary-50 text-primary-700'
                             : 'border-gray-300 hover:border-gray-400'
                         }`}
                       >
-                        {color}
+                        {image ? (
+                          <img
+                            src={image}
+                            alt={`${color} variant`}
+                            className="w-10 h-10 rounded-md object-cover border border-gray-200"
+                          />
+                        ) : null}
+                        <span>{color}</span>
                       </button>
                     ))}
                   </div>

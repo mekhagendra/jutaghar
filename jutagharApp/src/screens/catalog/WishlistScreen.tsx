@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import Header from '@/shared/components/Header';
 import { API_BASE_URL } from '@/api';
-import { addToCart } from '@/features/checkout';
 import type { Product } from '@/types';
 import {
     getWishlistItems,
@@ -50,11 +49,6 @@ export default function WishlistScreen({ onBack, onViewProduct, onBrowseProducts
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => { void removeFromWishlist(product._id); } },
     ]);
-  };
-
-  const handleAddToCart = async (product: Product) => {
-    await addToCart(product, 1);
-    Alert.alert('Added to Cart', `${product.name} has been added to your cart.`);
   };
 
   const getProductPrice = (product: Product) => {
@@ -106,20 +100,6 @@ export default function WishlistScreen({ onBack, onViewProduct, onBrowseProducts
               {'★'.repeat(Math.round(item.rating.average))} ({item.rating.count})
             </Text>
           )}
-          <TouchableOpacity
-            style={[styles.addToCartButton, item.stock <= 0 && styles.outOfStockButton]}
-            onPress={(event) => {
-              event.stopPropagation();
-              if (item.stock > 0) {
-                void handleAddToCart(item);
-              }
-            }}
-            disabled={item.stock <= 0}
-          >
-            <Text style={styles.addToCartText}>
-              {item.stock <= 0 ? 'Out of Stock' : '🛒 Add to Cart'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -187,9 +167,6 @@ const styles = StyleSheet.create({
   price: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e' },
   originalPrice: { fontSize: 13, color: '#95a5a6', textDecorationLine: 'line-through' },
   rating: { fontSize: 12, color: '#f39c12', marginBottom: 6 },
-  addToCartButton: { backgroundColor: '#3498db', borderRadius: 8, padding: 9, alignItems: 'center' },
-  outOfStockButton: { backgroundColor: '#bdc3c7' },
-  addToCartText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   emptyContainer: { alignItems: 'center', paddingVertical: 80 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },

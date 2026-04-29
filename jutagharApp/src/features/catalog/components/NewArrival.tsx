@@ -1,8 +1,8 @@
 import api, { API_BASE_URL } from '@/api';
-import { addToCart } from '@/features/checkout';
+import { isInWishlist, subscribeWishlist, toggleWishlist } from '@/stores/wishlistStore';
 import type { Product, ProductsResponse } from '@/types';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 interface NewArrivalProps {
   onViewProduct?: (product: Product) => void;
@@ -29,6 +29,7 @@ const getCategoryName = (cat: string | { _id: string; name: string }) => {
 export default function NewArrival({ onViewProduct }: NewArrivalProps) {
   const { width } = useWindowDimensions();
   const [products, setProducts] = useState<Product[]>([]);
+  const [, setWishlistTick] = useState(0);
 
   const numColumns = width > 992 ? 6 : width > 640 ? 3 : 2;
   const cardWidth = (width - 28 - (numColumns - 1) * 10) / numColumns;
@@ -46,10 +47,12 @@ export default function NewArrival({ onViewProduct }: NewArrivalProps) {
     fetchNewArrivals();
   }, [fetchNewArrivals]);
 
-  const handleAddToCart = (product: Product) => {
-    addToCart(product, 1);
-    Alert.alert('Added to Cart', `${product.name} has been added to your cart.`);
-  };
+  useEffect(() => {
+    const unsubscribe = subscribeWishlist(() => {
+      setWishlistTick((tick) => tick + 1);
+    });
+    return unsubscribe;
+  }, []);
 
   if (products.length === 0) return null;
 
@@ -87,6 +90,15 @@ export default function NewArrival({ onViewProduct }: NewArrivalProps) {
                     <Text style={styles.saleBadgeText}>SALE</Text>
                   </View>
                 )}
+                <TouchableOpacity
+                  style={styles.wishlistButton}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    void toggleWishlist(item);
+                  }}
+                >
+                  <Text style={styles.wishlistIcon}>{isInWishlist(item._id) ? '♥' : '♡'}</Text>
+                </TouchableOpacity>
               </View>
               <View style={styles.info}>
                 <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
@@ -102,15 +114,6 @@ export default function NewArrival({ onViewProduct }: NewArrivalProps) {
                     {'★'.repeat(Math.round(item.rating.average))}{'☆'.repeat(5 - Math.round(item.rating.average))} ({item.rating.count})
                   </Text>
                 )}
-                <TouchableOpacity
-                  style={[styles.addToCartButton, item.stock <= 0 && styles.outOfStockButton]}
-                  onPress={() => item.stock > 0 && handleAddToCart(item)}
-                  disabled={item.stock <= 0}
-                >
-                  <Text style={styles.addToCartText}>
-                    {item.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
-                  </Text>
-                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           );
@@ -186,6 +189,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
   },
+  wishlistButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 2,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wishlistIcon: {
+    fontSize: 16,
+    color: '#e74c3c',
+  },
   info: {
     padding: 10,
   },
@@ -220,19 +236,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#f39c12',
     marginBottom: 6,
-  },
-  addToCartButton: {
-    backgroundColor: '#3498db',
-    borderRadius: 8,
-    padding: 9,
-    alignItems: 'center',
-  },
-  outOfStockButton: {
-    backgroundColor: '#bdc3c7',
-  },
-  addToCartText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

@@ -69,12 +69,10 @@ export const createOrder = async (req, res) => {
         const variant = stripOperators({ ...item.variant });
         const variantColor = variant.color ? asString(variant.color) : '';
         const variantSize = variant.size ? asString(variant.size) : '';
-        const variantSku = variant.sku ? asString(variant.sku) : '';
         // Find the specific variant
         selectedVariant = product.variants.find(v =>
           (!variantColor || v.color === variantColor) &&
-          (!variantSize || v.size === variantSize) &&
-          (!variantSku || v.sku === variantSku)
+          (!variantSize || v.size === variantSize)
         );
 
         if (!selectedVariant) {
@@ -88,7 +86,6 @@ export const createOrder = async (req, res) => {
         const variantMatch = { quantity: { $gte: quantity } };
         if (variantColor) variantMatch.color = variantColor;
         if (variantSize) variantMatch.size = variantSize;
-        if (variantSku) variantMatch.sku = variantSku;
 
         stockUpdated = await Product.findOneAndUpdate(
           {
@@ -121,7 +118,7 @@ export const createOrder = async (req, res) => {
       }
 
       // Determine price
-      let itemPrice = selectedVariant?.price || product.price;
+      let itemPrice = product.price;
 
       const itemTotal = itemPrice * quantity;
       subtotal += itemTotal;

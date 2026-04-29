@@ -77,7 +77,9 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
   };
 
   const getItemPrice = (item: CartItem) => {
-    return item.selectedVariant?.price || item.product.salePrice || item.product.price;
+    return item.product.onSale && item.product.salePrice
+      ? item.product.salePrice
+      : item.product.price;
   };
 
   const getVariantKey = (variant?: CartItem['selectedVariant']) => {

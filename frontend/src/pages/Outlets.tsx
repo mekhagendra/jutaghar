@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { MapPin, Phone, Mail, Store, Search } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -15,6 +16,7 @@ interface Vendor {
 }
 
 const Outlets: React.FC = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
   const { data, isLoading } = useQuery({
@@ -87,7 +89,16 @@ const Outlets: React.FC = () => {
               {filteredVendors.map((vendor: Vendor) => (
                   <div
                     key={vendor._id}
-                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200 group"
+                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200 group cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/products?vendor=${vendor._id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/products?vendor=${vendor._id}`);
+                      }
+                    }}
                   >
                     <div className="p-5 flex flex-col sm:flex-row sm:items-stretch gap-4">
                       <div className="w-full sm:w-52 shrink-0 aspect-video overflow-hidden rounded-lg border border-gray-200">

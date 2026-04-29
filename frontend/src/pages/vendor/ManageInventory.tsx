@@ -10,8 +10,6 @@ interface ProductVariant {
   _id?: string;
   color: string;
   size: string;
-  sku: string;
-  price: number;
   quantity: number;
   status?: string;
   image?: string;
@@ -21,7 +19,7 @@ interface Product {
   _id: string;
   name: string;
   brand: string;
-  sku: string;
+  sku?: string;
   category: string;
   mainImage?: string;
   price: number;
@@ -38,8 +36,6 @@ const ManageInventory: React.FC = () => {
   const [variantForm, setVariantForm] = useState<ProductVariant>({
     color: '',
     size: '',
-    sku: '',
-    price: 0,
     quantity: 0,
     status: 'active',
     image: ''
@@ -154,9 +150,8 @@ const ManageInventory: React.FC = () => {
       setVariantForm({
         color: '',
         size: '',
-        sku: `${product.sku}-`,
-        price: product.price,
         quantity: 0,
+        status: 'active',
         image: ''
       });
     }
@@ -167,8 +162,6 @@ const ManageInventory: React.FC = () => {
     setVariantForm({
       color: '',
       size: '',
-      sku: '',
-      price: 0,
       quantity: 0,
       status: 'active',
       image: ''
@@ -179,13 +172,13 @@ const ManageInventory: React.FC = () => {
   const handleSaveVariant = () => {
     if (!selectedProduct) return;
 
-    if (!variantForm.color || !variantForm.size || !variantForm.sku) {
+    if (!variantForm.color || !variantForm.size) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    if (variantForm.price <= 0 || variantForm.quantity < 0) {
-      toast.error('Please enter valid price and quantity');
+    if (variantForm.quantity < 0) {
+      toast.error('Please enter a valid quantity');
       return;
     }
 
@@ -371,6 +364,7 @@ const ManageInventory: React.FC = () => {
                     </p>
                     <div className="flex gap-4 mt-2 text-sm">
                       <span className="text-gray-700">Base Price: NPR {selectedProduct.price}</span>
+                      <span className="text-gray-700">SKU: {selectedProduct.sku || 'N/A'}</span>
                       <span className="text-gray-700">Total Stock: {selectedProduct.stock || 0}</span>
                     </div>
                   </div>
@@ -388,8 +382,6 @@ const ManageInventory: React.FC = () => {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -409,8 +401,6 @@ const ManageInventory: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-900">{variant.color || '-'}</td>
                             <td className="px-4 py-3 text-sm text-gray-900">{variant.size || '-'}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{variant.sku}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900">NPR {variant.price}</td>
                             <td className="px-4 py-3 text-sm">
                               <span className={`px-2 py-1 rounded-full text-xs ${
                                 variant.quantity > 10 ? 'bg-green-100 text-green-800' :
@@ -548,33 +538,6 @@ const ManageInventory: React.FC = () => {
                     onChange={(e) => setVariantForm(prev => ({ ...prev, size: e.target.value }))}
                     className="input"
                     placeholder="e.g., S, M, L, XL"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    SKU *
-                  </label>
-                  <input
-                    type="text"
-                    value={variantForm.sku}
-                    onChange={(e) => setVariantForm(prev => ({ ...prev, sku: e.target.value }))}
-                    className="input"
-                    placeholder="Unique variant SKU"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price (NPR) *
-                  </label>
-                  <input
-                    type="number"
-                    value={variantForm.price}
-                    onChange={(e) => setVariantForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                    className="input"
-                    min="0"
-                    step="0.01"
                   />
                 </div>
 

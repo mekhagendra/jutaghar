@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Product, CartItem } from '@/types';
 
-const CART_STORAGE_KEY = 'jutaghar_cart';
+const CART_STORAGE_KEY = 'jutaghar_cart_v3';
 
 let cartItems: CartItem[] = [];
 let listeners: ((items: CartItem[]) => void)[] = [];
@@ -111,7 +111,9 @@ export function getTotalItems(): number {
 
 export function getTotalPrice(): number {
   return cartItems.reduce((sum, item) => {
-    const price = item.selectedVariant?.price || item.product.salePrice || item.product.price;
+    const price = item.product.onSale && item.product.salePrice
+      ? item.product.salePrice
+      : item.product.price;
     return sum + price * item.quantity;
   }, 0);
 }

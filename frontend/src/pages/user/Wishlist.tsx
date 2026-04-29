@@ -2,20 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Trash2, ShoppingCart } from 'lucide-react';
 import { useWishlistStore } from '@/stores/wishlistStore';
-import { useCartStore } from '@/stores/cartStore';
 import { formatCurrency } from '@/lib/utils';
-import type { Product } from '@/types';
 
 const UserWishlist: React.FC = () => {
   const { items, removeItem } = useWishlistStore();
-  const { addItem } = useCartStore();
 
-  const handleMoveToCart = (product: Product) => {
-    addItem(product, 1);
-    removeItem(product._id);
-  };
-
-  const mainImage = (product: Product) =>
+  const mainImage = (product: { mainImage?: string; images?: string[] }) =>
     product.mainImage || product.images?.[0] || '';
 
   if (items.length === 0) {
@@ -75,15 +67,8 @@ const UserWishlist: React.FC = () => {
 
               <div className="flex gap-2 mt-3">
                 <button
-                  onClick={() => handleMoveToCart(product)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-900 text-white text-xs font-medium hover:bg-gray-700 transition-colors"
-                >
-                  <ShoppingCart className="w-3.5 h-3.5" />
-                  Add to Cart
-                </button>
-                <button
                   onClick={() => removeItem(product._id)}
-                  className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
+                  className="w-full p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
                   aria-label="Remove from wishlist"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

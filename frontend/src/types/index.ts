@@ -50,14 +50,13 @@ export interface ProductVariant {
   _id?: string;
   color?: string;
   size?: string;
-  sku?: string;
-  price?: number;
   quantity: number;
   image?: string;
 }
 
 export interface Product {
   _id: string;
+  sku?: string;
   name: string;
   description: string;
   price: number;
@@ -150,7 +149,6 @@ export interface CartItem {
     color?: string;
     size?: string;
     sku?: string;
-    price?: number;
     image?: string;
   };
 }
