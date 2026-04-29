@@ -1,7 +1,11 @@
 import { API_BASE_URL } from '@/api';
 import type { Product } from '@/types';
-import React from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+
+const HORIZONTAL_PADDING = 14;
+const CARD_GAP = 10;
+const AUTO_SCROLL_INTERVAL_MS = 3200;
 
 interface FeaturedProps {
   products: Product[];
@@ -22,7 +26,38 @@ const getProductPrice = (product: Product) => {
 };
 
 export default function Featured({ products, onViewProduct }: FeaturedProps) {
-  if (products.length === 0) return null;
+  const { width } = useWindowDimensions();
+  const listRef = useRef<FlatList<Product>>(null);
+  const currentIndexRef = useRef(0);
+  const isUserInteractingRef = useRef(false);
+
+  const featuredItems = products.slice(0, 4);
+  const visibleItems = width > 992 ? 4 : width > 760 ? 3 : width > 520 ? 2 : 1;
+  const viewportWidth = width - HORIZONTAL_PADDING * 2;
+  const cardWidth = (viewportWidth - (visibleItems - 1) * CARD_GAP) / visibleItems;
+  const itemSize = cardWidth + CARD_GAP;
+  const maxStartIndex = Math.max(0, featuredItems.length - visibleItems);
+
+  useEffect(() => {
+    currentIndexRef.current = 0;
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [itemSize, featuredItems.length]);
+
+  useEffect(() => {
+    if (maxStartIndex === 0) return;
+
+    const id = setInterval(() => {
+      if (isUserInteractingRef.current) return;
+
+      const nextIndex = currentIndexRef.current >= maxStartIndex ? 0 : currentIndexRef.current + 1;
+      listRef.current?.scrollToOffset({ offset: nextIndex * itemSize, animated: true });
+      currentIndexRef.current = nextIndex;
+    }, AUTO_SCROLL_INTERVAL_MS);
+
+    return () => clearInterval(id);
+  }, [itemSize, maxStartIndex]);
+
+  if (featuredItems.length === 0) return null;
 
   return (
     <View style={styles.container}>
@@ -33,17 +68,38 @@ export default function Featured({ products, onViewProduct }: FeaturedProps) {
         </View>
       </View>
       <FlatList
-        horizontal
-        data={products}
+        ref={listRef}
+        data={featuredItems}
         keyExtractor={(item) => `featured-${item._id}`}
+        horizontal
         showsHorizontalScrollIndicator={false}
+        scrollEnabled
+        snapToInterval={itemSize}
+        decelerationRate="fast"
+        snapToAlignment="start"
+        disableIntervalMomentum
+        bounces={false}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.listContent}
+        onScrollBeginDrag={() => {
+          isUserInteractingRef.current = true;
+        }}
+        onMomentumScrollEnd={(event) => {
+          const offsetX = event.nativeEvent.contentOffset.x;
+          currentIndexRef.current = Math.max(0, Math.min(maxStartIndex, Math.round(offsetX / itemSize)));
+          isUserInteractingRef.current = false;
+        }}
+        getItemLayout={(_, index) => ({
+          length: itemSize,
+          offset: itemSize * index,
+          index,
+        })}
         renderItem={({ item }) => {
           const { price, originalPrice, onSale } = getProductPrice(item);
           const imageUrl = getImageUrl(item.mainImage || item.images?.[0]);
           return (
             <TouchableOpacity
-              style={styles.card}
+              style={[styles.card, { width: cardWidth }]}
               onPress={() => onViewProduct?.(item)}
               activeOpacity={0.8}
             >
@@ -102,22 +158,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   listContent: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 16,
+  },
+  separator: {
+    width: 10,
   },
   card: {
-    width: 155,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 4,
+    borderRadius: 14,
     overflow: 'hidden',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   imageContainer: {
-    height: 130,
+    aspectRatio: 1,
     backgroundColor: '#f0f0f0',
     position: 'relative',
   },
@@ -151,16 +209,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   info: {
-    padding: 10,
+    padding: 12,
   },
   name: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 3,
+    marginBottom: 4,
   },
   price: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1a1a2e',
   },

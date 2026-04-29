@@ -1,9 +1,7 @@
 import api, { API_BASE_URL } from '@/api';
 import type { Product } from '@/types';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-const { width } = Dimensions.get('window');
+import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 interface SaleProps {
   onViewProduct?: (product: Product) => void;
@@ -16,16 +14,20 @@ const getImageUrl = (path?: string) => {
 };
 
 export default function Sale({ onViewProduct }: SaleProps) {
+  const { width } = useWindowDimensions();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const numColumns = width > 992 ? 6 : width > 640 ? 3 : 2;
+  const cardWidth = (width - 28 - (numColumns - 1) * 10) / numColumns;
 
   useEffect(() => {
     const fetchSaleProducts = async () => {
       try {
-        const res = await api.get<{ products?: Product[] }>('/api/products?onSale=true&limit=20');
-        setProducts((res.data?.products || []).filter((p) => p.onSale));
+        const res = await api.get<{ products?: Product[] }>('/api/products?onSale=true&limit=6');
+        setProducts((res.data?.products || []).filter((p) => p.onSale).slice(0, 6));
       } catch {
-        console.log('Failed to fetch sale products');
+        // silent
       } finally {
         setLoading(false);
       }
@@ -43,15 +45,14 @@ export default function Sale({ onViewProduct }: SaleProps) {
 
   if (products.length === 0) return null;
 
-  const cardWidth = (width - 36) / 2;
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>🏷️ Sale</Text>
       <FlatList
+        key={numColumns}
         data={products}
         keyExtractor={(item) => `sale-${item._id}`}
-        numColumns={2}
+        numColumns={numColumns}
         scrollEnabled={false}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.listContent}
@@ -123,16 +124,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   listContent: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 14,
+    paddingBottom: 20,
   },
   row: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
+    gap: 10,
+    marginBottom: 10,
+    paddingHorizontal: 0,
   },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    marginBottom: 12,
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
@@ -143,7 +145,7 @@ const styles = StyleSheet.create({
     borderColor: '#fde8e8',
   },
   imageContainer: {
-    height: 155,
+    aspectRatio: 1,
     backgroundColor: '#f0f0f0',
     position: 'relative',
   },

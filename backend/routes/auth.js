@@ -47,7 +47,8 @@ const verifyChangePasswordValidation = [
 
 const updateProfileValidation = [
   body('fullName').trim().notEmpty(),
-  body('phone').trim().notEmpty()
+  body('phone').trim().notEmpty(),
+  body('sellerImage').optional({ checkFalsy: true }).isURL().withMessage('sellerImage must be a valid URL')
 ];
 
 const loginValidation = [

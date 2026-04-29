@@ -15,6 +15,7 @@ export interface User {
     reviewedAt?: string;
   };
   avatar?: string;
+  sellerImage?: string;
   businessName?: string;
   businessAddress?: string;
   createdAt?: string;

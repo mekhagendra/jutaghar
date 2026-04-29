@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+  Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -10,6 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import Header from '@/shared/components/Header';
 import MfaSetupScreen from './MfaSetupScreen';
 import api from '@/api';
@@ -31,6 +33,8 @@ export default function ProfileScreen({ userData, onLogout, onViewOrders, resetT
 
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [sellerImage, setSellerImage] = useState(user?.sellerImage || '');
+  const [sellerImageUri, setSellerImageUri] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -48,7 +52,27 @@ export default function ProfileScreen({ userData, onLogout, onViewOrders, resetT
   useEffect(() => {
     setCurrentView('menu');
     setShowAccountInfo(false);
+    setSellerImage(user?.sellerImage || '');
+    setSellerImageUri('');
   }, [resetToken]);
+
+  const pickSellerImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission Required', 'Please allow photo access to upload seller image.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.85,
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setSellerImageUri(result.assets[0].uri);
+    }
+  };
 
   const handleSaveProfile = async () => {
     if (!fullName.trim()) {
@@ -57,8 +81,19 @@ export default function ProfileScreen({ userData, onLogout, onViewOrders, resetT
     }
     setIsSaving(true);
     try {
-      await api.put('/api/auth/profile', { fullName, phone });
+      let nextSellerImage = sellerImage;
+      if (user?.role === 'seller' && sellerImageUri) {
+        nextSellerImage = await api.uploadSellerImage(sellerImageUri);
+      }
+
+      await api.put('/api/auth/profile', {
+        fullName,
+        phone,
+        sellerImage: user?.role === 'seller' ? nextSellerImage : undefined,
+      });
       await getCurrentUser();
+      setSellerImage(nextSellerImage);
+      setSellerImageUri('');
       Alert.alert('Success', 'Profile updated successfully');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update profile');
@@ -165,6 +200,18 @@ export default function ProfileScreen({ userData, onLogout, onViewOrders, resetT
               <Text style={styles.label}>Phone</Text>
               <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone number" keyboardType="phone-pad" />
             </View>
+            {user?.role === 'seller' && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Seller Image (16:9)</Text>
+                <TouchableOpacity style={styles.pickImageButton} onPress={pickSellerImage}>
+                  <Text style={styles.pickImageText}>{sellerImageUri || sellerImage ? 'Change Image' : 'Pick Image'}</Text>
+                </TouchableOpacity>
+                {!!(sellerImageUri || sellerImage) && (
+                  <Image source={{ uri: sellerImageUri || sellerImage }} style={styles.previewImage} resizeMode="cover" />
+                )}
+                <Text style={styles.hint}>Upload image in 16:9 ratio for outlets card.</Text>
+              </View>
+            )}
             <TouchableOpacity
               style={[styles.saveButton, isSaving && styles.disabledButton]}
               onPress={handleSaveProfile}

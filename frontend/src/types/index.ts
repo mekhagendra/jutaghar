@@ -13,6 +13,7 @@ export interface VendorRequest {
   businessName?: string;
   businessAddress?: string;
   taxId?: string;
+  sellerImage?: string;
   requestedAt?: string;
   reviewedAt?: string;
   rejectionReason?: string;
@@ -28,6 +29,7 @@ export interface User {
   avatar?: string;
   googleId?: string;
   businessName?: string;
+  sellerImage?: string;
   businessLicense?: string;
   businessAddress?: string;
   taxId?: string;

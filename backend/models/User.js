@@ -77,6 +77,7 @@ const userSchema = new mongoose.Schema({
   businessLicense: String,
   businessAddress: String,
   taxId: String,
+  sellerImage: String,
   
   // User affiliation data
   affiliations: [affiliationSchema],
@@ -95,6 +96,7 @@ const userSchema = new mongoose.Schema({
     businessName: String,
     businessAddress: String,
     taxId: String,
+    sellerImage: String,
     requestedAt: Date,
     reviewedAt: Date,
     reviewedBy: {

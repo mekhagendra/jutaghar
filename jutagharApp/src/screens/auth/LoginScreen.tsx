@@ -341,7 +341,7 @@ export default function LoginScreen({ onLogin, onGoToRegister }: LoginScreenProp
           </View>
           <Text style={styles.pendingTitle}>Account Pending Approval</Text>
           <Text style={styles.pendingMessage}>
-            Your vendor account is currently under review. Our team will verify your details and activate your account shortly.
+            Your seller account is currently under review. Our team will verify your details and activate your account shortly.
           </Text>
           <View style={styles.pendingEmailBox}>
             <Text style={styles.pendingEmailLabel}>Check your email</Text>

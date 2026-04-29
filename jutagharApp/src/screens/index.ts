@@ -1,6 +1,7 @@
 export { default as LoginScreen } from './auth/LoginScreen';
 export { default as UserRegistrationScreen } from './auth/UserRegistrationScreen';
 export { default as HomeScreen } from './catalog/HomeScreen';
+export { default as OutletsScreen } from './catalog/OutletsScreen';
 export { default as ProductDetailScreen } from './catalog/ProductDetailScreen';
 export { default as ProductsScreen } from './catalog/ProductsScreen';
 export { default as WishlistScreen } from './catalog/WishlistScreen';
@@ -11,9 +12,9 @@ export { default as ContactScreen } from './misc/ContactScreen';
 export { default as OrderDetailScreen } from './profile/OrderDetailScreen';
 export { default as OrdersScreen } from './profile/OrdersScreen';
 export { default as ProfileScreen } from './profile/ProfileScreen';
-export { default as SellerHomeScreen } from './seller/SellerHomeScreen';
-export { default as SellerProductsScreen } from './seller/SellerProductsScreen';
 export { default as SellerAddProductScreen } from './seller/SellerAddProductScreen';
 export { default as SellerEditProductScreen } from './seller/SellerEditProductScreen';
+export { default as SellerHomeScreen } from './seller/SellerHomeScreen';
 export { default as SellerOrdersScreen } from './seller/SellerOrdersScreen';
+export { default as SellerProductsScreen } from './seller/SellerProductsScreen';
 

@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 
 const STATUS_OPTIONS = ['all', 'pending', 'processing', 'shipped', 'delivered', 'returned', 'cancelled'] as const;
-const ACTIVE_VENDOR_STAGES = ['pending', 'processing', 'shipped', 'delivered', 'returned'] as const;
+const ACTIVE_SELLER_STAGES = ['pending', 'processing', 'shipped', 'delivered', 'returned'] as const;
 
-interface VendorOrdersResponse {
+interface SellerOrdersResponse {
   orders: Order[];
   pagination: {
     page: number;
@@ -49,7 +49,7 @@ export default function SellerOrdersScreen() {
         params.set('status', nextStatus);
       }
 
-      const res = await api.get<{ data?: VendorOrdersResponse } | VendorOrdersResponse>(`/api/vendors/orders?${params.toString()}`);
+      const res = await api.get<{ data?: SellerOrdersResponse } | SellerOrdersResponse>(`/api/vendors/orders?${params.toString()}`);
       const data = (res.data as any)?.data || res.data;
       const list = data?.orders || [];
       const pagination = data?.pagination || { page: nextPage, pages: 1, total: list.length };
@@ -58,7 +58,7 @@ export default function SellerOrdersScreen() {
       setSelectedStatusByOrder((prev) => {
         const next = { ...prev };
         (Array.isArray(list) ? list : []).forEach((order) => {
-          if (ACTIVE_VENDOR_STAGES.includes(order.status as any) && !next[order._id]) {
+          if (ACTIVE_SELLER_STAGES.includes(order.status as any) && !next[order._id]) {
             next[order._id] = order.status;
           }
         });
@@ -142,7 +142,7 @@ export default function SellerOrdersScreen() {
     const customerEmail = (item as any).user?.email || '';
     const statusStyle = getStatusColor(item.status);
 
-    const selectedStage = selectedStatusByOrder[item._id] || (ACTIVE_VENDOR_STAGES.includes(item.status as any) ? item.status : 'pending');
+    const selectedStage = selectedStatusByOrder[item._id] || (ACTIVE_SELLER_STAGES.includes(item.status as any) ? item.status : 'pending');
     const isExpanded = expandedOrderId === item._id;
     const isCancelledOrRefunded = item.status === 'cancelled' || item.status === 'refunded';
     const cancelReason = cancelReasonByOrder[item._id] || '';
@@ -199,7 +199,7 @@ export default function SellerOrdersScreen() {
               <>
                 <Text style={[styles.detailLabel, { marginTop: 10 }]}>Set Stage</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stageRow}>
-                  {ACTIVE_VENDOR_STAGES.map((stage) => (
+                  {ACTIVE_SELLER_STAGES.map((stage) => (
                     <TouchableOpacity
                       key={stage}
                       style={[styles.stageChip, selectedStage === stage && styles.stageChipActive]}
@@ -287,7 +287,7 @@ export default function SellerOrdersScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Vendor Orders</Text>
+        <Text style={styles.headerTitle}>Seller Orders</Text>
       </View>
 
       <View style={styles.filterBar}>

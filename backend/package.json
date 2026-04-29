@@ -11,6 +11,7 @@
     "test:api": "node test-api.js",
     "seed": "node seedProducts.js",
     "seed-catalog": "node seedCatalog.js",
+    "seed-seller-images": "node scripts/seed-seller-images.js",
     "create-admin": "node createAdmin.js",
     "drop-sku-index": "node dropSkuIndex.js",
     "docs": "echo 'API Documentation available at http://localhost:8000/api/docs'"

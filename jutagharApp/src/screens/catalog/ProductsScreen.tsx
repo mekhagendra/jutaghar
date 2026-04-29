@@ -1,27 +1,38 @@
-import { addToCart } from '@/features/checkout';
 import api, { API_BASE_URL } from '@/api';
+import { addToCart } from '@/features/checkout';
 import Header from '@/shared/components/Header';
 import type { Brand, Category, Product, ProductsResponse } from '@/types';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
-const { width } = Dimensions.get('window');
-
 type SelectorType = 'gender' | 'category' | 'brand' | null;
+
+const GENDER_CASE_MAP: Record<string, string> = {
+  men: 'Men',
+  women: 'Women',
+  kids: 'Kids',
+  unisex: 'Unisex',
+};
+
+const normalizeGenderValue = (value?: string | null): string | null => {
+  if (!value) return null;
+  const normalized = GENDER_CASE_MAP[value.trim().toLowerCase()];
+  return normalized || value;
+};
 
 // ---------------------------------------------------------------------------
 // PriceFilterRow — owns its own local state so typing never triggers a
@@ -114,6 +125,7 @@ interface ProductsScreenProps {
   initialGender?: string | null;
   initialSort?: string | null;
   initialBrand?: string | null;
+  initialVendor?: string | null;
   initialSearch?: string;
 }
 
@@ -125,8 +137,10 @@ export default function ProductsScreen({
   initialGender,
   initialSort,
   initialBrand,
+  initialVendor,
   initialSearch,
 }: ProductsScreenProps) {
+  const { width } = useWindowDimensions();
   const listRef = useRef<FlatList<Product>>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -135,7 +149,8 @@ export default function ProductsScreen({
   const [searchQuery, setSearchQuery] = useState(initialSearch || '');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory || null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(initialBrand || null);
-  const [selectedGender, setSelectedGender] = useState<string | null>(initialGender || null);
+  const [selectedVendor, setSelectedVendor] = useState<string | null>(initialVendor || null);
+  const [selectedGender, setSelectedGender] = useState<string | null>(normalizeGenderValue(initialGender));
   const [sortBy, setSortBy] = useState(initialSort || 'new');
   const [showSort, setShowSort] = useState(false);
   const [activeSelector, setActiveSelector] = useState<SelectorType>(null);
@@ -172,7 +187,9 @@ export default function ProductsScreen({
       if (searchQuery) params.append('search', searchQuery);
       if (selectedCategory) params.append('category', selectedCategory);
       if (selectedBrand) params.append('brand', selectedBrand);
-      if (selectedGender) params.append('gender', selectedGender);
+      if (selectedVendor) params.append('vendor', selectedVendor);
+      const normalizedGender = normalizeGenderValue(selectedGender);
+      if (normalizedGender) params.append('gender', normalizedGender);
       if (appliedMinPrice) params.append('minPrice', appliedMinPrice);
       if (appliedMaxPrice) params.append('maxPrice', appliedMaxPrice);
 
@@ -183,7 +200,7 @@ export default function ProductsScreen({
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, selectedCategory, selectedBrand, selectedGender, sortBy, appliedMinPrice, appliedMaxPrice]);
+  }, [searchQuery, selectedCategory, selectedBrand, selectedVendor, selectedGender, sortBy, appliedMinPrice, appliedMaxPrice]);
 
   useEffect(() => {
     fetchFilters();
@@ -224,6 +241,7 @@ export default function ProductsScreen({
   const clearAllFilters = () => {
     setSelectedCategory(null);
     setSelectedBrand(null);
+    setSelectedVendor(null);
     setSelectedGender(null);
     setAppliedMinPrice('');
     setAppliedMaxPrice('');
@@ -241,6 +259,12 @@ export default function ProductsScreen({
     (selectedBrand ? 1 : 0) +
     (selectedGender ? 1 : 0) +
     (appliedMinPrice || appliedMaxPrice ? 1 : 0);
+
+  const numColumns = width > 992 ? 6 : width > 640 ? 3 : 2;
+  const cardHorizontalGap = 12;
+  const listHorizontalPadding = 12;
+  const productCardWidth =
+    (width - listHorizontalPadding * 2 - (numColumns - 1) * cardHorizontalGap) / numColumns;
 
   const selectorValue = (type: Exclude<SelectorType, null>) => {
     if (type === 'gender') return selectedGender || 'All';
@@ -262,7 +286,7 @@ export default function ProductsScreen({
 
   const handleSelectorChange = (type: Exclude<SelectorType, null>, value: string | null) => {
     if (type === 'gender') {
-      setSelectedGender(value);
+      setSelectedGender(normalizeGenderValue(value));
     } else if (type === 'category') {
       setSelectedCategory(value);
     } else {
@@ -278,7 +302,7 @@ export default function ProductsScreen({
 
     return (
       <TouchableOpacity
-        style={styles.productCard}
+        style={[styles.productCard, { width: productCardWidth }]}
         onPress={() => onViewProduct(item)}
         activeOpacity={0.8}
       >
@@ -439,9 +463,10 @@ export default function ProductsScreen({
       ) : (
         <FlatList
           ref={listRef}
+          key={numColumns}
           data={products}
           keyExtractor={(item) => item._id}
-          numColumns={2}
+          numColumns={numColumns}
           columnWrapperStyle={styles.productRow}
           contentContainerStyle={styles.productList}
           renderItem={renderProductCard}
@@ -543,13 +568,11 @@ const styles = StyleSheet.create({
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  productList: { paddingHorizontal: 6, paddingBottom: 20 },
-  productRow: { justifyContent: 'space-between', paddingHorizontal: 6 },
+  productList: { paddingHorizontal: 12, paddingBottom: 20 },
+  productRow: { justifyContent: 'flex-start', gap: 12, marginBottom: 12 },
   productCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    width: (width - 36) / 2,
-    marginBottom: 12,
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',

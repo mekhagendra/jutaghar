@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '@/api';
 import type { Product } from '@/types';
 import React from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 interface TrendingProps {
   products: Product[];
@@ -22,23 +22,30 @@ const getProductPrice = (product: Product) => {
 };
 
 export default function Trending({ products, onViewProduct }: TrendingProps) {
+  const { width } = useWindowDimensions();
   if (products.length === 0) return null;
+
+  const trendingItems = products.slice(0, 6);
+  const numColumns = width > 992 ? 6 : width > 640 ? 3 : 2;
+  const cardWidth = (width - 28 - (numColumns - 1) * 10) / numColumns;
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>🔥 Trending</Text>
       <FlatList
-        horizontal
-        data={products}
+        key={numColumns}
+        data={trendingItems}
         keyExtractor={(item) => `trending-${item._id}`}
-        showsHorizontalScrollIndicator={false}
+        numColumns={numColumns}
+        scrollEnabled={false}
+        columnWrapperStyle={styles.row}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => {
           const { price, originalPrice, onSale } = getProductPrice(item);
           const imageUrl = getImageUrl(item.mainImage || item.images?.[0]);
           return (
             <TouchableOpacity
-              style={styles.card}
+              style={[styles.card, { width: cardWidth }]}
               onPress={() => onViewProduct?.(item)}
               activeOpacity={0.8}
             >
@@ -90,13 +97,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   listContent: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 16,
+  },
+  row: {
+    gap: 10,
+    marginBottom: 10,
   },
   card: {
-    width: 155,
     backgroundColor: '#fff',
     borderRadius: 12,
-    marginHorizontal: 4,
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
@@ -105,7 +115,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   imageContainer: {
-    height: 130,
+    aspectRatio: 1,
     backgroundColor: '#f0f0f0',
     position: 'relative',
   },

@@ -12,10 +12,12 @@ const UserProfile: React.FC = () => {
     businessName: '',
     businessAddress: '',
     taxId: '',
+    sellerImage: '',
   });
+  const [sellerImageFile, setSellerImageFile] = useState<File | null>(null);
 
   const vendorRequestMutation = useMutation({
-    mutationFn: async (data: { businessName: string; businessAddress: string; taxId: string }) => {
+    mutationFn: async (data: { businessName: string; businessAddress: string; taxId: string; sellerImage: string }) => {
       const response = await api.post('/api/auth/vendor-request', data);
       return response.data;
     },
@@ -40,7 +42,26 @@ const UserProfile: React.FC = () => {
       toast.error('Tax ID is required');
       return;
     }
-    vendorRequestMutation.mutate(vendorForm);
+    const run = async () => {
+      let sellerImage = vendorForm.sellerImage;
+      if (sellerImageFile) {
+        const formData = new FormData();
+        formData.append('image', sellerImageFile);
+        const uploadRes = await api.post('/api/uploads/seller-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        sellerImage = uploadRes.data?.data?.url || sellerImage;
+      }
+
+      vendorRequestMutation.mutate({
+        ...vendorForm,
+        sellerImage,
+      });
+    };
+
+    run().catch(() => {
+      toast.error('Failed to upload seller image');
+    });
   };
 
   const vendorRequestStatus = user?.vendorRequest?.status || 'none';
@@ -126,6 +147,17 @@ const UserProfile: React.FC = () => {
                 placeholder="PAN / VAT number"
                 required
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Seller Image File (16:9)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setSellerImageFile(e.target.files?.[0] || null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">Upload image file in 16:9 ratio (e.g. 1600x900).</p>
             </div>
 
             <div>

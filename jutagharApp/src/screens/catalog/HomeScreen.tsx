@@ -11,12 +11,12 @@ import type { Brand, Category as CategoryType, Product, ProductsResponse } from 
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 
 interface HomeScreenProps {
@@ -25,7 +25,8 @@ interface HomeScreenProps {
   userData?: any;
   onViewProduct?: (product: Product) => void;
   onViewCart?: () => void;
-  onViewProducts?: (options?: { category?: string; gender?: string; sort?: string; brand?: string }) => void;
+  onViewProducts?: (options?: { category?: string; gender?: string; sort?: string; brand?: string; vendor?: string }) => void;
+  onViewOutlets?: () => void;
   onViewOrders?: () => void;
   onViewProfile?: () => void;
   onViewWishlist?: () => void;
@@ -33,13 +34,11 @@ interface HomeScreenProps {
   onViewContact?: () => void;
 }
 
-export default function HomeScreen({ onViewProduct, onViewProducts }: HomeScreenProps) {
+export default function HomeScreen({ onViewProduct, onViewProducts, onViewOutlets }: HomeScreenProps) {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryType[]>([]);
-  const [menCategories, setMenCategories] = useState<CategoryType[]>([]);
-  const [womenCategories, setWomenCategories] = useState<CategoryType[]>([]);
-  const [kidsCategories, setKidsCategories] = useState<CategoryType[]>([]);
+
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,7 +51,7 @@ export default function HomeScreen({ onViewProduct, onViewProducts }: HomeScreen
     try {
       // Fetch the sections needed for first paint first.
       const [featuredRes, trendingRes, categoriesRes] = await Promise.all([
-        api.get<ProductsResponse>('/api/products?limit=6&sort=rating'),
+        api.get<ProductsResponse>('/api/products?limit=4&sort=rating'),
         api.get<ProductsResponse>('/api/products?limit=6&sort=popular'),
         api.get<CategoryType[]>('/api/catalog/categories?status=active'),
       ]);
@@ -63,25 +62,12 @@ export default function HomeScreen({ onViewProduct, onViewProducts }: HomeScreen
 
       setIsLoading(false);
 
-      // Fetch secondary navigation data in the background.
-      const [brandsRes, menCatRes, womenCatRes, kidsCatRes] = await Promise.all([
-        api.get<Brand[]>('/api/catalog/brands?status=active').catch(() => ({ data: [] as Brand[] })),
-        api.get('/api/catalog/categories?withInventory=true&gender=men').catch(() => ({ data: { data: [] } })),
-        api.get('/api/catalog/categories?withInventory=true&gender=women').catch(() => ({ data: { data: [] } })),
-        api.get('/api/catalog/categories?withInventory=true&gender=kids').catch(() => ({ data: { data: [] } })),
-      ]);
-
+      // Fetch brands in the background.
+      const brandsRes = await api.get<Brand[]>('/api/catalog/brands?status=active').catch(() => ({ data: [] as Brand[] }));
       setBrands(Array.isArray(brandsRes.data) ? brandsRes.data : []);
 
-      const extractCats = (res: any) => {
-        const cats = res.data?.data || res.data || [];
-        return Array.isArray(cats) ? cats.filter((c: any) => c.productCount && c.productCount > 0) : [];
-      };
-      setMenCategories(extractCats(menCatRes));
-      setWomenCategories(extractCats(womenCatRes));
-      setKidsCategories(extractCats(kidsCatRes));
-    } catch (error: any) {
-      console.log('Error fetching data:', error.message);
+    } catch {
+      // Non-critical: screen will render with whatever was loaded before the error.
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -130,7 +116,7 @@ export default function HomeScreen({ onViewProduct, onViewProducts }: HomeScreen
         { key: 'new-arrival', label: 'New Arrival', icon: '✨', onPress: () => onViewProducts?.({ sort: 'new' }) },
         { key: 'best-seller', label: 'Best Seller', icon: '🔥', onPress: () => onViewProducts?.({ sort: 'popular' }) },
         { key: 'sale', label: 'Sale', icon: '🏷️', onPress: () => onViewProducts?.({ sort: 'price-asc' }) },
-        { key: 'outlets', label: 'Outlets', icon: '🏪', onPress: () => onViewProducts?.() },
+        { key: 'outlets', label: 'Outlets', icon: '🏪', onPress: () => onViewOutlets?.() },
       ]} />
 
       <ScrollView
@@ -160,7 +146,7 @@ export default function HomeScreen({ onViewProduct, onViewProducts }: HomeScreen
         />
 
         {/* New Arrivals Grid */}
-        <NewArrival onViewProduct={onViewProduct} onLoadMore={() => onViewProducts?.({ sort: 'new' })} />
+        <NewArrival onViewProduct={onViewProduct} />
       </ScrollView>
     </View>
   );

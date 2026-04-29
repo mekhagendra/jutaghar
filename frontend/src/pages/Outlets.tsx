@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { MapPin, Phone, Mail, Store, ExternalLink, Search } from 'lucide-react';
+import { MapPin, Phone, Mail, Store, Search } from 'lucide-react';
 import api from '@/lib/api';
 
 interface Vendor {
@@ -11,8 +10,8 @@ interface Vendor {
   email: string;
   phone: string;
   businessAddress?: string;
+  sellerImage?: string;
   role: string;
-  productCount?: number;
 }
 
 const Outlets: React.FC = () => {
@@ -84,23 +83,35 @@ const Outlets: React.FC = () => {
             </div>
 
             {/* Outlets Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {filteredVendors.map((vendor: Vendor) => (
                   <div
                     key={vendor._id}
                     className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200 group"
                   >
-                    <div className="p-6">
-                      {/* Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition flex-1">
-                          {vendor.businessName || vendor.fullName}
-                        </h3>
-                        <Store className="w-10 h-10 text-primary-600 bg-primary-50 p-2 rounded-lg flex-shrink-0" />
+                    <div className="p-5 flex flex-col sm:flex-row sm:items-stretch gap-4">
+                      <div className="w-full sm:w-52 shrink-0 aspect-video overflow-hidden rounded-lg border border-gray-200">
+                        {vendor.sellerImage ? (
+                          <img
+                            src={vendor.sellerImage}
+                            alt={vendor.businessName || vendor.fullName}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-primary-50 border border-primary-100 flex items-center justify-center">
+                            <Store className="w-10 h-10 text-primary-600" />
+                          </div>
+                        )}
                       </div>
 
-                      {/* Contact Info */}
-                      <div className="space-y-2 mb-4">
+                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div>
+                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition mb-3">
+                          {vendor.businessName || vendor.fullName}
+                        </h3>
+
+                        <div className="space-y-2 mb-4">
                         {vendor.businessAddress && (
                           <div className="flex items-start gap-2 text-sm text-gray-600">
                             <MapPin className="w-4 h-4 mt-0.5 text-gray-400 flex-shrink-0" />
@@ -119,23 +130,10 @@ const Outlets: React.FC = () => {
                             <span className="truncate">{vendor.email}</span>
                           </div>
                         )}
-                      </div>
-
-                      {/* Product Count */}
-                      {vendor.productCount !== undefined && (
-                        <div className="text-sm text-gray-500 mb-4">
-                          {vendor.productCount} {vendor.productCount === 1 ? 'Product' : 'Products'}
                         </div>
-                      )}
 
-                      {/* View Products Button */}
-                      <Link
-                        to={`/products?vendor=${vendor._id}`}
-                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-medium"
-                      >
-                        View Products
-                        <ExternalLink className="w-4 h-4" />
-                      </Link>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}

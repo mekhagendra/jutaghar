@@ -72,4 +72,23 @@ router.post('/hero', authenticate, requireAdmin, (req, res) => {
   });
 });
 
+router.post('/seller-image', authenticate, (req, res) => {
+  upload.single('image')(req, res, async (error) => {
+    if (error) {
+      return handleUploadError(error, res);
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'Image file is required' });
+      }
+
+      const url = await uploadImageBuffer(req.file.buffer, 'sellers');
+      return res.status(201).json({ success: true, data: { url } });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  });
+});
+
 export default router;

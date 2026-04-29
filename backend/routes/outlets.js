@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
     }
 
     const vendors = await User.find(query)
-      .select('fullName businessName email phone businessAddress role')
+      .select('fullName businessName email phone businessAddress role sellerImage')
       .sort('-createdAt');
 
     // Get product counts for each vendor

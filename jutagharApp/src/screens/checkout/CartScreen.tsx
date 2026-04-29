@@ -38,9 +38,41 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
     return unsubscribe;
   }, []);
 
-  const getImageUrl = (path?: string) => {
+  const extractImagePath = (value: unknown): string | null => {
+    if (!value) return null;
+    if (typeof value === 'string') return value.trim() || null;
+
+    if (typeof value === 'object') {
+      const candidate = value as {
+        url?: string;
+        uri?: string;
+        path?: string;
+        src?: string;
+      };
+      return (
+        candidate.url?.trim() ||
+        candidate.uri?.trim() ||
+        candidate.path?.trim() ||
+        candidate.src?.trim() ||
+        null
+      );
+    }
+
+    return null;
+  };
+
+  const getImageUrl = (value: unknown) => {
+    const path = extractImagePath(value);
     if (!path) return null;
-    if (path.startsWith('http')) return path;
+    if (
+      path.startsWith('http://') ||
+      path.startsWith('https://') ||
+      path.startsWith('file://') ||
+      path.startsWith('data:') ||
+      path.startsWith('asset://')
+    ) {
+      return path;
+    }
     return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
   };
 
@@ -94,9 +126,10 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
         <>
           <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={false}>
             {items.map((item, index) => {
-              const imageUrl = getImageUrl(
-                item.selectedVariant?.image || item.product.mainImage || item.product.images?.[0]
-              );
+              const imageUrl =
+                getImageUrl(item.selectedVariant?.image) ||
+                getImageUrl(item.product.mainImage) ||
+                getImageUrl(item.product.images?.[0]);
               const price = getItemPrice(item);
 
               return (

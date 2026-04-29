@@ -23,14 +23,14 @@ export default function SellerHomeScreen({ onAddProduct, onManageProducts, onVie
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchVendorStats();
+    fetchSellerStats();
   }, []);
 
-  const fetchVendorStats = async () => {
+  const fetchSellerStats = async () => {
     try {
       const [productsRes, ordersRes] = await Promise.all([
         api.get<any>('/api/products/vendor/my-products?limit=1'),
-        api.get<any>('/api/orders/vendor/orders?limit=1'),
+        api.get<any>('/api/vendors/orders?limit=1'),
       ]);
       setStats({
         listings: productsRes.data?.pagination?.total || productsRes.data?.data?.pagination?.total || 0,

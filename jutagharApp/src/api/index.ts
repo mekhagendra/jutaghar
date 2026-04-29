@@ -268,6 +268,37 @@ class ApiClient {
     return data?.data?.urls || [];
   }
 
+  async uploadSellerImage(imageUri: string): Promise<string> {
+    if (!imageUri) {
+      throw new Error('Seller image is required');
+    }
+
+    const formData = new FormData();
+    const mimeType = this.inferMimeTypeFromUri(imageUri);
+    formData.append('image', {
+      uri: imageUri,
+      name: `seller-${Date.now()}.jpg`,
+      type: mimeType,
+    } as any);
+
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+    const response = await fetch(`${this.baseURL}/api/uploads/seller-image`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.message || 'Seller image upload failed');
+    }
+
+    return data?.data?.url || '';
+  }
+
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint);
   }

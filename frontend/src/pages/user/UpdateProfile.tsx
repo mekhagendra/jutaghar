@@ -9,14 +9,17 @@ import { useAuthStore } from '@/stores/authStore';
 const UpdateProfile: React.FC = () => {
   const navigate = useNavigate();
   const { user, updateUser } = useAuthStore();
+  const isSeller = user?.role === 'seller';
 
   const [profileForm, setProfileForm] = useState({
     fullName: user?.fullName ?? '',
     phone: user?.phone ?? '',
+    sellerImage: user?.sellerImage ?? '',
   });
+  const [sellerImageFile, setSellerImageFile] = useState<File | null>(null);
 
   const profileMutation = useMutation({
-    mutationFn: async (data: { fullName: string; phone: string }) => {
+    mutationFn: async (data: { fullName: string; phone: string; sellerImage?: string }) => {
       const response = await api.put('/api/auth/profile', data);
       return response.data.data;
     },
@@ -36,7 +39,28 @@ const UpdateProfile: React.FC = () => {
       toast.error('Full name is required');
       return;
     }
-    profileMutation.mutate(profileForm);
+    const run = async () => {
+      let nextSellerImage = profileForm.sellerImage;
+
+      if (isSeller && sellerImageFile) {
+        const formData = new FormData();
+        formData.append('image', sellerImageFile);
+        const uploadRes = await api.post('/api/uploads/seller-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        nextSellerImage = uploadRes.data?.data?.url || nextSellerImage;
+      }
+
+      profileMutation.mutate({
+        fullName: profileForm.fullName,
+        phone: profileForm.phone,
+        sellerImage: isSeller ? nextSellerImage : undefined,
+      });
+    };
+
+    run().catch(() => {
+      toast.error('Failed to upload seller image');
+    });
   };
 
   return (
@@ -98,6 +122,30 @@ const UpdateProfile: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
+
+          {isSeller && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Seller Image File (16:9)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setSellerImageFile(e.target.files?.[0] || null)
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Upload image in 16:9 ratio for outlets card.</p>
+              {!!profileForm.sellerImage && !sellerImageFile && (
+                <img
+                  src={profileForm.sellerImage}
+                  alt="Current seller"
+                  className="mt-2 w-full aspect-video rounded-md object-cover border border-gray-200"
+                />
+              )}
+            </div>
+          )}
 
           <button
             type="submit"

@@ -86,6 +86,7 @@ function toAuthUser(user) {
     role: user.role,
     status: user.status,
     businessName: user.businessName,
+    sellerImage: user.sellerImage,
     avatar: user.avatar,
     vendorRequest: user.vendorRequest,
     mfa: { enabled: !!user.mfa?.enabled },
@@ -505,11 +506,16 @@ export const logout = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { fullName, phone } = req.body;
+    const { fullName, phone, sellerImage } = req.body;
+
+    const updateDoc = { fullName, phone };
+    if (req.user?.role === 'seller') {
+      updateDoc.sellerImage = sellerImage?.trim() || '';
+    }
 
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { fullName, phone },
+      updateDoc,
       { new: true, runValidators: true }
     ).select('-password -passwordReset -passwordChange -emailVerification');
 
@@ -865,7 +871,7 @@ export const appleLogin = async (req, res) => {
 // Request vendor status (user requests to become an outlet from profile)
 export const requestVendor = async (req, res) => {
   try {
-    const { businessName, businessAddress, taxId } = req.body;
+    const { businessName, businessAddress, taxId, sellerImage } = req.body;
 
     if (!businessName || !businessName.trim()) {
       return res.status(400).json({
@@ -900,6 +906,7 @@ export const requestVendor = async (req, res) => {
       businessName: businessName.trim(),
       businessAddress: businessAddress?.trim() || '',
       taxId: taxId?.trim() || '',
+      sellerImage: sellerImage?.trim() || '',
       requestedAt: new Date(),
     };
     await user.save();
@@ -944,6 +951,7 @@ export const reviewVendorRequest = async (req, res) => {
       user.businessName = user.vendorRequest.businessName;
       user.businessAddress = user.vendorRequest.businessAddress;
       user.taxId = user.vendorRequest.taxId;
+      user.sellerImage = user.vendorRequest.sellerImage || user.sellerImage || '';
       user.approvedAt = new Date();
       user.approvedBy = req.user._id;
       user.vendorRequest.status = 'approved';

@@ -10,6 +10,7 @@ import {
     LoginScreen,
     OrderDetailScreen,
     OrdersScreen,
+    OutletsScreen,
     ProductDetailScreen,
     ProductsScreen,
     ProfileScreen,
@@ -22,11 +23,11 @@ import {
     WishlistScreen
 } from '@/screens';
 import Footer, { type TabName } from '@/shared/components/Footer';
-import { setHomeNavigationListener } from '@/shared/navigation/homeNavigation';
 import SellerFooter, { type SellerTabName } from '@/shared/components/SellerFooter';
+import { setHomeNavigationListener } from '@/shared/navigation/homeNavigation';
 import type { Product } from '@/types';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 type ViewType = 'login' | 'register';
 type Screen =
@@ -36,6 +37,7 @@ type Screen =
   | 'cart'
   | 'checkout'
   | 'products'
+  | 'outlets'
   | 'orders'
   | 'order-detail'
   | 'profile'
@@ -61,6 +63,7 @@ export default function Index() {
   const [selectedGender, setSelectedGender] = useState<string | null>(null);
   const [selectedSort, setSelectedSort] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
   const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
   const [profileResetToken, setProfileResetToken] = useState(0);
 
@@ -123,6 +126,7 @@ export default function Index() {
       setSelectedGender(null);
       setSelectedSort(null);
       setSelectedBrand(null);
+      setSelectedVendor(null);
     });
 
     return () => setHomeNavigationListener(null);
@@ -168,12 +172,17 @@ export default function Index() {
     navigateTo('cart');
   };
 
-  const handleViewProducts = (options?: { category?: string; gender?: string; sort?: string; brand?: string }) => {
+  const handleViewProducts = (options?: { category?: string; gender?: string; sort?: string; brand?: string; vendor?: string }) => {
     setSelectedCategory(options?.category || null);
     setSelectedGender(options?.gender || null);
     setSelectedSort(options?.sort || null);
     setSelectedBrand(options?.brand || null);
+    setSelectedVendor(options?.vendor || null);
     navigateTo('products');
+  };
+
+  const handleViewOutlets = () => {
+    navigateTo('outlets');
   };
 
   const handleViewOrders = () => {
@@ -221,6 +230,7 @@ export default function Index() {
     setSelectedGender(null);
     setSelectedSort(null);
     setSelectedBrand(null);
+    setSelectedVendor(null);
   };
 
   const getActiveTab = (): TabName => {
@@ -377,8 +387,11 @@ export default function Index() {
             initialGender={selectedGender}
             initialSort={selectedSort}
             initialBrand={selectedBrand}
+            initialVendor={selectedVendor}
           />
         );
+      case 'outlets':
+        return <OutletsScreen onViewProducts={handleViewProducts} />;
       case 'cart':
         return (
           <CartScreen
@@ -409,6 +422,7 @@ export default function Index() {
           <HomeScreen
             onViewProduct={handleViewProduct}
             onViewProducts={handleViewProducts}
+            onViewOutlets={handleViewOutlets}
           />
         );
     }
