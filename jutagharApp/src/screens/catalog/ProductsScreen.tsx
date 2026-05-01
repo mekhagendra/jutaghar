@@ -196,8 +196,8 @@ export default function ProductsScreen({
 
       const res = await api.get<ProductsResponse>(`/api/products?${params.toString()}`);
       setProducts(res.data?.products || []);
-    } catch {
-      Alert.alert('Error', 'Failed to load products');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to load products');
     } finally {
       setIsLoading(false);
     }

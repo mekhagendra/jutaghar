@@ -135,11 +135,6 @@ export default function OrderDetailScreen({ orderId, onBack }: OrderDetailScreen
             <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
               <Text style={[styles.statusBadgeText, { color: statusStyle.text }]}>{order.status}</Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.paymentStatus).bg }]}>
-              <Text style={[styles.statusBadgeText, { color: getStatusColor(order.paymentStatus).text }]}>
-                {order.paymentStatus}
-              </Text>
-            </View>
           </View>
           <Text style={styles.orderDate}>Placed on {formatDate(order.createdAt)}</Text>
         </View>

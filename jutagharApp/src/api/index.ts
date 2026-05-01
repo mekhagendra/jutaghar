@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 const PROD_API_BASE_URL = 'https://jutaghar.com';
+const PROD_API_FALLBACK_BASE_URLS = ['https://www.jutaghar.com'];
 
 function normalizeBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/, '');
@@ -56,7 +57,7 @@ interface HttpResult {
 
 class ApiClient {
   private baseURL: string;
-  private readonly fallbackBaseURL: string | null;
+  private readonly fallbackBaseURLs: string[];
 
   private readonly authBypassRefreshEndpoints = new Set([
     '/api/auth/login',
@@ -72,7 +73,11 @@ class ApiClient {
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
-    this.fallbackBaseURL = __DEV__ && baseURL !== PROD_API_BASE_URL ? PROD_API_BASE_URL : null;
+    if (__DEV__) {
+      this.fallbackBaseURLs = baseURL !== PROD_API_BASE_URL ? [PROD_API_BASE_URL] : [];
+    } else {
+      this.fallbackBaseURLs = PROD_API_FALLBACK_BASE_URLS.filter((url) => url !== baseURL);
+    }
   }
 
   private isProductionBuild(): boolean {
@@ -165,25 +170,27 @@ class ApiClient {
       return message.includes('route not found');
     };
 
-    let response: HttpResult;
+    const requestBaseURLs = [this.baseURL, ...this.fallbackBaseURLs];
+    let response: HttpResult | null = null;
     let requestBaseURL = this.baseURL;
-    let retriedWithFallback = false;
+    let lastNetworkError: any = null;
 
-    try {
-      response = await runRequest(requestBaseURL);
-    } catch (error: any) {
-      const canRetryWithFallback = !!this.fallbackBaseURL && requestBaseURL !== this.fallbackBaseURL;
-      if (canRetryWithFallback) {
-        requestBaseURL = this.fallbackBaseURL as string;
-        response = await runRequest(requestBaseURL);
-        retriedWithFallback = true;
-      } else {
-        const message =
-          typeof error?.message === 'string' && error.message.includes('Network request failed')
-            ? `Network request failed. Verify backend is reachable at ${requestBaseURL}.`
-            : error?.message || 'Network request failed.';
-        throw new Error(message);
+    for (const candidateBaseURL of requestBaseURLs) {
+      try {
+        response = await runRequest(candidateBaseURL);
+        requestBaseURL = candidateBaseURL;
+        break;
+      } catch (error: any) {
+        lastNetworkError = error;
       }
+    }
+
+    if (!response) {
+      const message =
+        typeof lastNetworkError?.message === 'string' && lastNetworkError.message.includes('Network request failed')
+          ? `Network request failed. Verify backend is reachable at ${requestBaseURLs.join(' or ')}.`
+          : lastNetworkError?.message || 'Network request failed.';
+      throw new Error(message);
     }
 
     const shouldBypassRefresh = this.authBypassRefreshEndpoints.has(endpoint);
@@ -209,13 +216,19 @@ class ApiClient {
       data = null;
     }
 
-    if (isRouteNotFound(response.status, data) && this.fallbackBaseURL && !retriedWithFallback) {
-      requestBaseURL = this.fallbackBaseURL;
-      response = await runRequest(requestBaseURL);
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
+    if (isRouteNotFound(response.status, data)) {
+      for (const candidateBaseURL of this.fallbackBaseURLs) {
+        if (candidateBaseURL === requestBaseURL) continue;
+        requestBaseURL = candidateBaseURL;
+        response = await runRequest(requestBaseURL);
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+        if (!isRouteNotFound(response.status, data)) {
+          break;
+        }
       }
     }
 

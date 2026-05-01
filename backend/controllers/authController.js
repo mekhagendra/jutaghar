@@ -76,6 +76,26 @@ async function createSession(userId, req) {
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+function isGoogleAuthConfigMissing() {
+  return !process.env.GOOGLE_CLIENT_ID || !String(process.env.GOOGLE_CLIENT_ID).trim();
+}
+
+function isGoogleCredentialVerificationError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('wrong number of segments')
+    || message.includes('jwt')
+    || message.includes('token used too late')
+    || message.includes('token used too early')
+    || message.includes('invalid token')
+    || message.includes('token expired')
+    || message.includes('wrong recipient')
+    || message.includes('audience')
+    || message.includes('issuer')
+    || message.includes('signature')
+  );
+}
+
 function toAuthUser(user) {
   return {
     id: user._id,
@@ -647,11 +667,36 @@ export const googleLogin = async (req, res) => {
       });
     }
 
-    // Verify the Google ID token
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    if (isGoogleAuthConfigMissing()) {
+      return res.status(500).json({
+        success: false,
+        message: 'Google Sign-In is not configured on the server',
+        requestId: req.id,
+      });
+    }
+
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch (error) {
+      logger.warn({ err: error, requestId: req.id }, 'Google credential verification failed');
+
+      if (isGoogleCredentialVerificationError(error)) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid Google credential'
+        });
+      }
+
+      return res.status(503).json({
+        success: false,
+        message: 'Unable to verify Google credential at this time',
+        requestId: req.id,
+      });
+    }
 
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
@@ -715,6 +760,7 @@ export const googleLogin = async (req, res) => {
       }
     });
   } catch (error) {
+    logger.error({ err: error, requestId: req.id }, 'Google Sign-In failed unexpectedly');
     res.status(500).json({
       success: false,
       message: 'Internal error', requestId: req.id
