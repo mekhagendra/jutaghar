@@ -10,7 +10,6 @@ import {
     useWindowDimensions,
     View,
 } from 'react-native';
-import Header from '@/shared/components/Header';
 import api from '@/api';
 import type { Order } from '@/types';
 
@@ -98,8 +97,6 @@ export default function OrdersScreen({ onBack, onViewOrder }: OrdersScreenProps)
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-
-      <Header />
 
       {/* Filter Tabs */}
       <View style={styles.filterBar}>

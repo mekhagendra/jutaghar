@@ -17,6 +17,8 @@ router.get('/stats', vendorController.getVendorStats);
 // Vendor orders (B2C sales)
 router.get('/orders', vendorController.getVendorOrders);
 router.get('/orders/:id', vendorController.getVendorOrderById);
+router.get('/returns', vendorController.getVendorReturns);
+router.patch('/returns/:orderId/:returnRequestId/status', vendorController.updateVendorReturnStatus);
 
 // Vendor products summary
 router.get('/products/summary', vendorController.getProductsSummary);

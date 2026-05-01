@@ -7,8 +7,68 @@ import DeliverySettings from '../models/DeliverySettings.js';
 import { calculateTaxForItems } from '../utils/taxCalculator.js';
 import { asNumber, asObjectId, asString, stripOperators } from '../utils/sanitizeInput.js';
 import { generateOrderNumber } from '../utils/orderNumber.js';
+import { sendOrderCancelledEmail, sendOrderPlacedEmail } from '../utils/orderEmail.js';
+import logger from '../utils/logger.js';
 
 const errorStatus = (error) => error?.statusCode || 500;
+
+const buildOrderItemKey = (item) => {
+  const productId = item?.product?._id || item?.product;
+  const sku = item?.variant?.sku || '';
+  const color = item?.variant?.color || '';
+  const size = item?.variant?.size || '';
+  return `${String(productId)}|${sku}|${color}|${size}`;
+};
+
+const mapReturnRequestItems = (order, requestedItems) => {
+  if (!Array.isArray(requestedItems) || requestedItems.length === 0) {
+    return order.items.map((item) => ({
+      product: item.product,
+      quantity: item.quantity,
+      variant: item.variant,
+    }));
+  }
+
+  const availableByKey = new Map();
+  for (const item of order.items) {
+    const key = buildOrderItemKey(item);
+    availableByKey.set(key, (availableByKey.get(key) || 0) + Number(item.quantity || 0));
+  }
+
+  const requestedByKey = new Map();
+  const normalized = [];
+
+  for (const raw of requestedItems) {
+    const payload = stripOperators({ ...(raw || {}) });
+    const product = asObjectId(payload.product);
+    const quantity = Math.max(1, asNumber(payload.quantity, 1));
+    const variant = payload.variant && typeof payload.variant === 'object'
+      ? {
+          color: payload.variant.color ? asString(payload.variant.color) : undefined,
+          size: payload.variant.size ? asString(payload.variant.size) : undefined,
+          sku: payload.variant.sku ? asString(payload.variant.sku) : undefined,
+        }
+      : undefined;
+
+    const key = buildOrderItemKey({ product, variant });
+    if (!availableByKey.has(key)) {
+      const err = new Error('Invalid return item selection');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    requestedByKey.set(key, (requestedByKey.get(key) || 0) + quantity);
+    if (requestedByKey.get(key) > availableByKey.get(key)) {
+      const err = new Error('Requested return quantity exceeds purchased quantity');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    normalized.push({ product, quantity, variant });
+  }
+
+  return normalized;
+};
 
 // Create order
 export const createOrder = async (req, res) => {
@@ -177,6 +237,18 @@ export const createOrder = async (req, res) => {
 
     await session.commitTransaction();
 
+    try {
+      if (user?.email) {
+        const populatedOrder = await Order.findById(order._id).populate('items.product', 'name');
+        await sendOrderPlacedEmail({
+          to: user.email,
+          order: populatedOrder || order,
+        });
+      }
+    } catch (mailError) {
+      logger.warn({ err: mailError, orderId: order._id }, 'Failed to send order placed email');
+    }
+
     res.status(201).json({
       success: true,
       data: order
@@ -311,6 +383,19 @@ export const cancelOrder = async (req, res) => {
       });
     }
 
+    try {
+      const user = await User.findById(order.user).select('email');
+      if (user?.email) {
+        const populatedOrder = await Order.findById(order._id).populate('items.product', 'name');
+        await sendOrderCancelledEmail({
+          to: user.email,
+          order: populatedOrder || order,
+        });
+      }
+    } catch (mailError) {
+      logger.warn({ err: mailError, orderId: order._id }, 'Failed to send order cancelled email');
+    }
+
     res.json({
       success: true,
       data: order
@@ -359,6 +444,86 @@ export const trackOrder = async (req, res) => {
     res.json({ success: true, data: safeOrder });
   } catch (error) {
     res.status(errorStatus(error)).json({ success: false, message: 'Internal error', requestId: req.id });
+  }
+};
+
+// Customer requests a return after delivery.
+export const requestReturn = async (req, res) => {
+  try {
+    const order = await Order.findById(asObjectId(req.params.id));
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to request return for this order'
+      });
+    }
+
+    if (order.status !== 'delivered') {
+      return res.status(400).json({
+        success: false,
+        message: 'Return can only be requested for delivered orders'
+      });
+    }
+
+    const sanitizedBody = stripOperators({ ...req.body });
+    const reason = sanitizedBody.reason ? asString(sanitizedBody.reason).trim() : '';
+    const description = sanitizedBody.description ? asString(sanitizedBody.description).trim() : '';
+    const images = Array.isArray(sanitizedBody.images)
+      ? sanitizedBody.images
+          .map((url) => asString(url).trim())
+          .filter(Boolean)
+          .slice(0, 5)
+      : [];
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Return reason is required'
+      });
+    }
+
+    const hasPending = (order.returnRequests || []).some((r) => r.status === 'requested');
+    if (hasPending) {
+      return res.status(409).json({
+        success: false,
+        message: 'A return request is already pending for this order'
+      });
+    }
+
+    const items = mapReturnRequestItems(order, sanitizedBody.items);
+    order.returnRequests.push({
+      items,
+      reason,
+      description,
+      images,
+      status: 'requested',
+      requestedAt: new Date(),
+    });
+
+    await order.save();
+
+    const populatedOrder = await Order.findById(order._id)
+      .populate('items.product', 'name images price')
+      .populate('items.vendor', 'businessName fullName')
+      .populate('returnRequests.items.product', 'name images');
+
+    res.status(201).json({
+      success: true,
+      data: populatedOrder || order,
+    });
+  } catch (error) {
+    res.status(errorStatus(error)).json({
+      success: false,
+      message: error.message || 'Internal error', requestId: req.id
+    });
   }
 };
 

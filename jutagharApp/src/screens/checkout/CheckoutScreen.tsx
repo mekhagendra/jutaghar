@@ -133,7 +133,7 @@ export default function CheckoutScreen({ onBack, onOrderSuccess, selectedItemKey
 
   useEffect(() => {
     void fetchTaxEstimate(selectedItems);
-  }, [selectedCheckoutItemKeys, items]);
+  }, [selectedItems]);
 
   const toggleCheckoutItemSelection = (item: CartItem) => {
     const key = getCartItemKey(item);

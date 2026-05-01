@@ -1,4 +1,3 @@
-import Header from '@/shared/components/Header';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -11,8 +10,6 @@ export default function AboutUsScreen({ onBack }: AboutUsScreenProps) {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-
-      <Header />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Hero */}

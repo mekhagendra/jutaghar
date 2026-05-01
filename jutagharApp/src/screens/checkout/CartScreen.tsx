@@ -9,7 +9,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import Header from '@/shared/components/Header';
 import { API_BASE_URL } from '@/api';
 import {
     getCartItems,
@@ -24,6 +23,13 @@ interface CartScreenProps {
   onCheckout?: (selectedItemKeys: string[]) => void;
   onBrowseProducts?: () => void;
 }
+
+const getVariantKey = (variant?: CartItem['selectedVariant']) => {
+  if (!variant) return undefined;
+  return `${variant.color || ''}-${variant.size || ''}-${variant.sku || ''}`;
+};
+
+const getCartItemKey = (item: CartItem) => `${item.product._id}::${getVariantKey(item.selectedVariant) || 'default'}`;
 
 export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: CartScreenProps) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -102,13 +108,6 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
       : item.product.price;
   };
 
-  const getVariantKey = (variant?: CartItem['selectedVariant']) => {
-    if (!variant) return undefined;
-    return `${variant.color || ''}-${variant.size || ''}-${variant.sku || ''}`;
-  };
-
-  const getCartItemKey = (item: CartItem) => `${item.product._id}::${getVariantKey(item.selectedVariant) || 'default'}`;
-
   const handleRemoveItem = (item: CartItem) => {
     Alert.alert('Remove Item', `Remove ${item.product.name} from cart?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -161,8 +160,6 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-
-      <Header />
 
       {items.length === 0 ? (
         <View style={styles.emptyContainer}>

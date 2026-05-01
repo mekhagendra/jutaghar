@@ -38,6 +38,60 @@ const shippingAddressSchema = new mongoose.Schema({
   country: String
 }, { _id: false });
 
+const returnRequestItemSchema = new mongoose.Schema({
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true,
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
+  variant: {
+    color: String,
+    size: String,
+    sku: String,
+  },
+}, { _id: false });
+
+const returnRequestSchema = new mongoose.Schema({
+  items: {
+    type: [returnRequestItemSchema],
+    default: [],
+  },
+  reason: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  description: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  images: {
+    type: [String],
+    default: [],
+  },
+  status: {
+    type: String,
+    enum: ['requested', 'initiated', 'returned', 'completed', 'rejected', 'approved'],
+    default: 'requested',
+  },
+  requestedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  reviewedAt: Date,
+  reviewNote: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+}, { _id: true });
+
 const orderSchema = new mongoose.Schema({
   orderNumber: {
     type: String,
@@ -105,7 +159,11 @@ const orderSchema = new mongoose.Schema({
   gatewayPidx: {
     type: String,
     default: undefined
-  }
+  },
+  returnRequests: {
+    type: [returnRequestSchema],
+    default: [],
+  },
 }, {
   timestamps: true
 });

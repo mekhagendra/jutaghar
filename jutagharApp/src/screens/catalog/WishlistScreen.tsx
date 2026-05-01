@@ -10,7 +10,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import Header from '@/shared/components/Header';
 import { API_BASE_URL } from '@/api';
 import type { Product } from '@/types';
 import {
@@ -108,8 +107,6 @@ export default function WishlistScreen({ onBack, onViewProduct, onBrowseProducts
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-
-      <Header />
 
       <FlatList
         data={items}

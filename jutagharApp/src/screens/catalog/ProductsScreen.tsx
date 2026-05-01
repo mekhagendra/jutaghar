@@ -1,6 +1,5 @@
 import api, { API_BASE_URL } from '@/api';
 import { isInWishlist, subscribeWishlist, toggleWishlist } from '@/features/catalog';
-import Header from '@/shared/components/Header';
 import type { Brand, Category, Product, ProductsResponse } from '@/types';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -302,6 +301,7 @@ export default function ProductsScreen({
   const renderProductCard = ({ item }: { item: Product }) => {
     const { price, originalPrice, onSale } = getProductPrice(item);
     const imageUrl = getImageUrl(item.mainImage || item.images?.[0]);
+    const isInStock = item.stock >= 10;
 
     return (
       <TouchableOpacity
@@ -345,6 +345,9 @@ export default function ProductsScreen({
               {'★'.repeat(Math.round(item.rating.average))} ({item.rating.count})
             </Text>
           )}
+          <Text style={[styles.stockStatusText, isInStock ? styles.stockInText : styles.stockOutText]}>
+            {isInStock ? 'In Stock' : 'Out of Stock'}
+          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -398,8 +401,6 @@ export default function ProductsScreen({
 
   const renderHeader = () => (
     <View style={styles.listHeader}>
-      <Header onSearch={(text) => setSearchQuery(text)} />
-
       <View style={styles.inlineFilterPanel}>
         <View style={styles.selectorRow}>
           <TouchableOpacity style={styles.selectorButton} onPress={() => setActiveSelector('gender')}>
@@ -608,6 +609,9 @@ const styles = StyleSheet.create({
   productPrice: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e' },
   originalPrice: { fontSize: 13, color: '#95a5a6', textDecorationLine: 'line-through' },
   ratingText: { fontSize: 12, color: '#f39c12', marginBottom: 6 },
+  stockStatusText: { fontSize: 12, fontWeight: '600' },
+  stockInText: { color: '#16a34a' },
+  stockOutText: { color: '#dc2626' },
 
   emptyContainer: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },

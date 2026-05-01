@@ -56,6 +56,7 @@ const ManageProducts = lazy(() => import('@/pages/vendor/ManageProducts'));
 const ManageInventory = lazy(() => import('@/pages/vendor/ManageInventory'));
 const VendorTaxSettings = lazy(() => import('@/pages/vendor/TaxSettings'));
 const VendorOrders = lazy(() => import('@/pages/vendor/Orders'));
+const VendorReturns = lazy(() => import('@/pages/vendor/Returns'));
 
 // Layout
 import MainLayout from '@/layouts/MainLayout';
@@ -192,6 +193,7 @@ function App() {
           >
             <Route path="/seller/dashboard" element={<VendorDashboard />} />
             <Route path="/seller/orders" element={<VendorOrders />} />
+            <Route path="/seller/returns" element={<VendorReturns />} />
             <Route path="/products/new" element={<NewProduct />} />
             <Route path="/products/manage" element={<ManageProducts />} />
             <Route path="/products/:id/edit" element={<EditProduct />} />

@@ -9,6 +9,7 @@ import { calculateTaxForItems } from '../utils/taxCalculator.js';
 import logger from '../utils/logger.js';
 import { writeAudit } from '../utils/audit.js';
 import { generateOrderNumber } from '../utils/orderNumber.js';
+import { sendOrderPlacedEmail } from '../utils/orderEmail.js';
 
 // eSewa configuration — validated lazily so the server can start without payment keys in dev
 const getEsewaSecretKey = () => {
@@ -350,6 +351,18 @@ export const initiateOrder = async (req, res) => {
         total: order.total,
       },
     });
+
+    try {
+      if (req.user?.email) {
+        const populatedOrder = await Order.findById(order._id).populate('items.product', 'name');
+        await sendOrderPlacedEmail({
+          to: req.user.email,
+          order: populatedOrder || order,
+        });
+      }
+    } catch (mailError) {
+      logger.warn({ err: mailError, orderId: order._id }, 'Failed to send order placed email (payment flow)');
+    }
 
     res.status(201).json({
       success: true,

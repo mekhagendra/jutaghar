@@ -10,7 +10,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import Header from '@/shared/components/Header';
 import api from '@/api';
 
 interface ContactScreenProps {
@@ -51,8 +50,6 @@ export default function ContactScreen({ onBack }: ContactScreenProps) {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-
-      <Header />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Info Cards */}

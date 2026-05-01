@@ -31,8 +31,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   // Check if product has special tags
   const isNew = product.tags?.includes('new-arrival');
   const isBestSeller = product.tags?.includes('best-seller');
-  const isLimitedStock = product.stock > 0 && product.stock < 10;
-  const isOutOfStock = product.stock === 0;
+  const isInStock = product.stock >= 10;
+  const isOutOfStock = !isInStock;
 
   return (
     <Link
@@ -70,11 +70,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {isBestSeller && (
             <span className="px-2 py-1 text-xs font-semibold rounded bg-yellow-500 text-white">
               Best Seller
-            </span>
-          )}
-          {isLimitedStock && (
-            <span className="px-2 py-1 text-xs font-semibold rounded bg-orange-500 text-white">
-              Only {product.stock} Left
             </span>
           )}
           {hasDiscount && !hasSale && (
@@ -197,11 +192,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         )}
 
         {/* Stock Status */}
-        {product.stock > 0 && product.stock < 20 && (
-          <p className="text-xs text-orange-600">
-            {product.stock} in stock
-          </p>
-        )}
+        <p className={`text-xs ${isInStock ? 'text-green-600' : 'text-red-600'}`}>
+          {isInStock ? 'In Stock' : 'Out of Stock'}
+        </p>
       </div>
     </Link>
   );

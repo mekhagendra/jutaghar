@@ -124,11 +124,10 @@ export default function SellerEditProductScreen({ product, onDone }: SellerEditP
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Edit Product</Text>
-      </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.screenTitle}>Edit Product</Text>
+
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Product Name</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Nike Air Max" />
@@ -236,15 +235,9 @@ export default function SellerEditProductScreen({ product, onDone }: SellerEditP
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
-  header: {
-    backgroundColor: '#1a1a2e',
-    paddingTop: 50,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-  },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   content: { flex: 1 },
   contentContainer: { padding: 14, paddingBottom: 120 },
+  screenTitle: { color: '#1a1a2e', fontSize: 20, fontWeight: '700', marginBottom: 10 },
   fieldGroup: { marginBottom: 14 },
   label: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6 },
   input: {

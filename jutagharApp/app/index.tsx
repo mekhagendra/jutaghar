@@ -23,6 +23,7 @@ import {
     WishlistScreen
 } from '@/screens';
 import Footer, { type TabName } from '@/shared/components/Footer';
+import Header from '@/shared/components/Header';
 import SellerFooter, { type SellerTabName } from '@/shared/components/SellerFooter';
 import { setHomeNavigationListener } from '@/shared/navigation/homeNavigation';
 import type { Product } from '@/types';
@@ -49,6 +50,22 @@ type Screen =
   | 'seller-edit-product'
   | 'seller-orders'
   | 'seller-account';
+
+interface MobileLayoutProps {
+  children: React.ReactNode;
+  onSearch: (query: string) => void;
+  onSelectSuggestion: (product: Product) => void;
+  onLogoPress: () => void;
+}
+
+function MobileLayout({ children, onSearch, onSelectSuggestion, onLogoPress }: MobileLayoutProps) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+      <Header onSearch={onSearch} onSelectSuggestion={onSelectSuggestion} onLogoPress={onLogoPress} />
+      <View style={{ flex: 1 }}>{children}</View>
+    </View>
+  );
+}
 
 export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -118,7 +135,7 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    setHomeNavigationListener(() => {
+    const goHome = () => {
       setShowLogin(false);
       setCurrentScreen(isLoggedIn && isSeller ? 'seller-home' : 'home');
       setScreenHistory([]);
@@ -129,6 +146,11 @@ export default function Index() {
       setSelectedSort(null);
       setSelectedBrand(null);
       setSelectedVendor(null);
+      setSelectedSearch('');
+    };
+
+    setHomeNavigationListener(() => {
+      goHome();
     });
 
     return () => setHomeNavigationListener(null);
@@ -436,7 +458,25 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1 }}>
-      {renderScreenContent()}
+      <MobileLayout
+        onSearch={(query) => handleViewProducts({ search: query })}
+        onSelectSuggestion={(product) => handleViewProduct(product)}
+        onLogoPress={() => {
+          setShowLogin(false);
+          setCurrentScreen(isLoggedIn && isSeller ? 'seller-home' : 'home');
+          setScreenHistory([]);
+          setSelectedProduct(null);
+          setSelectedOrderId(null);
+          setSelectedCategory(null);
+          setSelectedGender(null);
+          setSelectedSort(null);
+          setSelectedBrand(null);
+          setSelectedVendor(null);
+          setSelectedSearch('');
+        }}
+      >
+        {renderScreenContent()}
+      </MobileLayout>
       {isLoggedIn && isSeller ? (
         <SellerFooter
           activeTab={

@@ -12,7 +12,6 @@ import {
     View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import Header from '@/shared/components/Header';
 import MfaSetupScreen from './MfaSetupScreen';
 import api from '@/api';
 import { getAuthState, getCurrentUser } from '@/features/auth';
@@ -182,7 +181,6 @@ export default function ProfileScreen({ userData, onLogout, onViewOrders, resetT
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
-        <Header />
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
             <View style={styles.formGroup}>
@@ -230,7 +228,6 @@ export default function ProfileScreen({ userData, onLogout, onViewOrders, resetT
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
-        <Header />
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
             {changePasswordStep === 'form' ? (
@@ -297,7 +294,6 @@ export default function ProfileScreen({ userData, onLogout, onViewOrders, resetT
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <Header />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Avatar & Info */}

@@ -286,8 +286,8 @@ export default function SellerOrdersScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Seller Orders</Text>
+      <View style={styles.titleWrap}>
+        <Text style={styles.titleText}>Seller Orders</Text>
       </View>
 
       <View style={styles.filterBar}>
@@ -352,13 +352,12 @@ export default function SellerOrdersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: {
-    backgroundColor: '#1a1a2e',
-    paddingTop: 50,
-    paddingBottom: 14,
+  titleWrap: {
     paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
   },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  titleText: { color: '#1a1a2e', fontSize: 18, fontWeight: '700' },
   filterBar: {
     backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,

@@ -5,7 +5,6 @@ import Featured from '@/features/catalog/components/Featured';
 import NewArrival from '@/features/catalog/components/NewArrival';
 import Sale from '@/features/catalog/components/Sale';
 import Trending from '@/features/catalog/components/Trending';
-import Header from '@/shared/components/Header';
 import Navbar from '@/shared/components/Navbar';
 import type { Brand, Category as CategoryType, Product, ProductsResponse } from '@/types';
 import { StatusBar } from 'expo-status-bar';
@@ -96,12 +95,6 @@ export default function HomeScreen({ onViewProduct, onViewProducts, onViewOutlet
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-
-      {/* Header */}
-      <Header
-        onSearch={(text) => onViewProducts?.({ search: text })}
-        onSelectSuggestion={(product) => onViewProduct?.(product)}
-      />
 
       {/* Navbar */}
       <Navbar items={[

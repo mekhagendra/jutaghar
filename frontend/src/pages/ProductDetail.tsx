@@ -7,7 +7,14 @@ import { ShoppingCart, Star, AlertCircle, Trash2 } from 'lucide-react';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
-import type { ProductVariant } from '@/types';
+import type { Product, ProductVariant } from '@/types';
+
+const getCategoryName = (category?: Product['category']) => {
+  if (typeof category === 'string') return category;
+  return category?.name || '';
+};
+
+const normalizeText = (value?: string | null) => String(value || '').trim().toLowerCase();
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams();
@@ -53,6 +60,60 @@ const ProductDetail: React.FC = () => {
     enabled: !!id && isAuthenticated,
   });
 
+  const product = data;
+
+  const { data: relatedProducts = [], isLoading: relatedLoading } = useQuery({
+    queryKey: ['related-products', product?._id, product?.gender, getCategoryName(product?.category)],
+    enabled: !!product?._id && !!product?.gender,
+    queryFn: async () => {
+      const gender = normalizeText(product?.gender);
+      const category = normalizeText(getCategoryName(product?.category));
+
+      if (!gender) return [] as Product[];
+
+      const related: Product[] = [];
+      const seen = new Set<string>([product._id]);
+
+      const append = (items: Product[]) => {
+        for (const item of items) {
+          if (!item?._id || seen.has(item._id)) continue;
+          seen.add(item._id);
+          related.push(item);
+          if (related.length >= 8) break;
+        }
+      };
+
+      if (category) {
+        const strictParams = new URLSearchParams({
+          gender: product.gender || '',
+          category: getCategoryName(product.category),
+          sort: 'popular',
+          limit: '24',
+        });
+        const strictRes = await api.get(`/api/products?${strictParams.toString()}`);
+        const strictItems = (strictRes.data?.data?.products || []).filter((item: Product) => (
+          normalizeText(item.gender) === gender && normalizeText(getCategoryName(item.category)) === category
+        ));
+        append(strictItems);
+      }
+
+      if (related.length < 8) {
+        const fallbackParams = new URLSearchParams({
+          gender: product.gender || '',
+          sort: 'popular',
+          limit: '30',
+        });
+        const fallbackRes = await api.get(`/api/products?${fallbackParams.toString()}`);
+        const fallbackItems = (fallbackRes.data?.data?.products || []).filter(
+          (item: Product) => normalizeText(item.gender) === gender
+        );
+        append(fallbackItems);
+      }
+
+      return related.slice(0, 8);
+    },
+  });
+
   const submitReviewMutation = useMutation({
     mutationFn: async (payload: { productId: string; rating: number; comment: string }) => {
       const response = await api.post('/api/reviews', payload);
@@ -93,8 +154,6 @@ const ProductDetail: React.FC = () => {
     if (reviewRating === 0) { toast.error('Please select a rating'); return; }
     submitReviewMutation.mutate({ productId: id!, rating: reviewRating, comment: reviewComment });
   };
-
-  const product = data;
 
   // Extract unique colors and sizes from variants
   const availableColors = useMemo(() => {
@@ -147,6 +206,8 @@ const ProductDetail: React.FC = () => {
     return product?.stock || 0;
   }, [selectedVariant, product]);
 
+  const isInStock = availableStock >= 10;
+
   const galleryImages = useMemo(() => {
     if (!product) return [];
 
@@ -165,6 +226,11 @@ const ProductDetail: React.FC = () => {
 
   const handleAddToCart = () => {
     setError('');
+
+    if (!isInStock) {
+      setError('Out of stock');
+      return;
+    }
     
     // Check if product has variants
     const hasVariants = product?.variants && product.variants.length > 0;
@@ -304,8 +370,8 @@ const ProductDetail: React.FC = () => {
           </div>
 
           <div className="mb-6">
-            <span className={`badge ${availableStock > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-              {availableStock > 0 ? `${availableStock} in stock` : 'Out of stock'}
+            <span className={`badge ${isInStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {isInStock ? 'In Stock' : 'Out of Stock'}
             </span>
           </div>
 
@@ -379,22 +445,23 @@ const ProductDetail: React.FC = () => {
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="btn btn-secondary px-3 py-2"
-                disabled={quantity <= 1}
+                disabled={quantity <= 1 || !isInStock}
               >
                 -
               </button>
               <input
                 type="number"
                 min="1"
-                max={availableStock}
+                max={Math.max(1, availableStock)}
                 value={quantity}
                 onChange={(e) => setQuantity(Math.max(1, Math.min(availableStock, parseInt(e.target.value) || 1)))}
                 className="input w-20 text-center"
+                disabled={!isInStock}
               />
               <button
                 onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
                 className="btn btn-secondary px-3 py-2"
-                disabled={quantity >= availableStock}
+                disabled={quantity >= availableStock || !isInStock}
               >
                 +
               </button>
@@ -435,7 +502,7 @@ const ProductDetail: React.FC = () => {
           <div className="flex gap-4">
             <button
               onClick={handleAddToCart}
-              disabled={availableStock === 0}
+              disabled={!isInStock}
               className="btn btn-primary flex-1 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ShoppingCart className="w-5 h-5 mr-2" />
@@ -443,6 +510,52 @@ const ProductDetail: React.FC = () => {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold mb-6">You may like</h2>
+
+        {relatedLoading ? (
+          <div className="text-gray-500 py-4">Loading related products...</div>
+        ) : relatedProducts.length === 0 ? (
+          <div className="text-gray-500 py-6 border border-dashed rounded-lg text-center">
+            No related products found right now.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {relatedProducts.map((item: Product) => {
+              const itemPrice = item.onSale && item.salePrice ? item.salePrice : item.price;
+              const itemCategory = getCategoryName(item.category);
+              return (
+                <button
+                  key={item._id}
+                  type="button"
+                  onClick={() => navigate(`/products/${item._id}`)}
+                  className="text-left bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition"
+                >
+                  <div className="aspect-square bg-gray-100">
+                    {item.mainImage || item.images?.[0] ? (
+                      <img
+                        src={item.mainImage || item.images?.[0]}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">No Image</div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="text-sm font-semibold text-gray-900 line-clamp-2">{item.name}</p>
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                      {[itemCategory, item.gender].filter(Boolean).join(' • ')}
+                    </p>
+                    <p className="text-sm font-bold text-primary-700 mt-2">{formatCurrency(itemPrice)}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ─── Reviews Section ─── */}

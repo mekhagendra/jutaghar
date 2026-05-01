@@ -57,16 +57,16 @@ export default function SellerHomeScreen({ onAddProduct, onManageProducts, onVie
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      <View style={styles.header}>
-        <View style={styles.headerBadge}>
-          <Text style={styles.headerBadgeText}>SELLER PORTAL</Text>
-        </View>
-        <Text style={styles.welcomeText}>Welcome back, {sellerName}</Text>
-        <Text style={styles.subtitle}>Track performance and manage your store efficiently.</Text>
-        <Text style={styles.emailText}>{userData?.email}</Text>
-      </View>
-
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerCard}>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeText}>SELLER PORTAL</Text>
+          </View>
+          <Text style={styles.welcomeText}>Welcome back, {sellerName}</Text>
+          <Text style={styles.subtitle}>Track performance and manage your store efficiently.</Text>
+          <Text style={styles.emailText}>{userData?.email}</Text>
+        </View>
+
         <View style={styles.overviewCard}>
           <Text style={styles.overviewTitle}>Today&apos;s Overview</Text>
           <Text style={styles.overviewValue}>{stats.orders}</Text>
@@ -168,11 +168,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  header: {
+  headerCard: {
     backgroundColor: '#1a1a2e',
-    paddingTop: 50,
+    borderRadius: 14,
     paddingBottom: 22,
     paddingHorizontal: 20,
+    paddingTop: 16,
+    marginBottom: 14,
   },
   headerBadge: {
     alignSelf: 'flex-start',

@@ -91,4 +91,24 @@ router.post('/seller-image', authenticate, (req, res) => {
   });
 });
 
+router.post('/returns', authenticate, (req, res) => {
+  upload.array('images', 5)(req, res, async (error) => {
+    if (error) {
+      return handleUploadError(error, res);
+    }
+
+    try {
+      const files = req.files || [];
+      if (!files.length) {
+        return res.status(400).json({ success: false, message: 'At least one image is required' });
+      }
+
+      const urls = await Promise.all(files.map((file) => uploadImageBuffer(file.buffer, 'returns')));
+      return res.status(201).json({ success: true, data: { urls } });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  });
+});
+
 export default router;

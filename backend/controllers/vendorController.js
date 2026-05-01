@@ -4,6 +4,16 @@ import User from '../models/User.js';
 import TaxSettings from '../models/TaxSettings.js';
 import { asNumber, asString, stripOperators } from '../utils/sanitizeInput.js';
 
+const VENDOR_RETURN_STATUSES = ['requested', 'initiated', 'returned', 'completed', 'rejected'];
+
+const buildProductVariantKey = ({ product, variant }) => {
+  const productId = product?._id || product;
+  const sku = variant?.sku || '';
+  const color = variant?.color || '';
+  const size = variant?.size || '';
+  return `${String(productId)}|${sku}|${color}|${size}`;
+};
+
 // Get vendor statistics
 export const getVendorStats = async (req, res) => {
   try {
@@ -163,6 +173,185 @@ export const getVendorOrderById = async (req, res) => {
     res.json({
       success: true,
       data: orderObj
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal error', requestId: req.id
+    });
+  }
+};
+
+// Get vendor return requests
+export const getVendorReturns = async (req, res) => {
+  try {
+    const vendorId = req.user._id;
+    const safeQuery = stripOperators({ ...req.query });
+    const page = Math.max(1, asNumber(safeQuery.page, 1));
+    const limit = Math.min(100, Math.max(1, asNumber(safeQuery.limit, 10)));
+    const status = safeQuery.status ? asString(safeQuery.status).toLowerCase() : '';
+
+    const query = {
+      'items.vendor': vendorId,
+      'returnRequests.0': { $exists: true },
+    };
+
+    const orders = await Order.find(query)
+      .populate('user', 'fullName email phone')
+      .populate('items.product', 'name images')
+      .populate('returnRequests.items.product', 'name images')
+      .sort('-createdAt');
+
+    const flattened = [];
+
+    for (const order of orders) {
+      const vendorItemKeySet = new Set(
+        order.items
+          .filter((item) => item.vendor?.toString() === vendorId.toString())
+          .map((item) => buildProductVariantKey(item))
+      );
+
+      for (const request of order.returnRequests || []) {
+        const normalizedStatus = request.status === 'approved' ? 'initiated' : request.status;
+        if (status && normalizedStatus !== status) continue;
+
+        const requestItems = (request.items || []).filter((item) =>
+          vendorItemKeySet.has(buildProductVariantKey(item))
+        );
+
+        if (requestItems.length === 0) continue;
+
+        flattened.push({
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          orderStatus: order.status,
+          customer: order.user,
+          returnRequest: {
+            _id: request._id,
+            reason: request.reason,
+            description: request.description,
+            images: request.images || [],
+            status: normalizedStatus,
+            requestedAt: request.requestedAt,
+            reviewedAt: request.reviewedAt,
+            reviewNote: request.reviewNote || '',
+            items: requestItems,
+          },
+        });
+      }
+    }
+
+    flattened.sort((a, b) => {
+      const left = new Date(a.returnRequest.requestedAt || 0).getTime();
+      const right = new Date(b.returnRequest.requestedAt || 0).getTime();
+      return right - left;
+    });
+
+    const total = flattened.length;
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const currentPage = Math.min(page, pages);
+    const start = (currentPage - 1) * limit;
+    const data = flattened.slice(start, start + limit);
+
+    res.json({
+      success: true,
+      data: {
+        returns: data,
+        pagination: {
+          page: currentPage,
+          limit,
+          total,
+          pages,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal error', requestId: req.id
+    });
+  }
+};
+
+// Update return request status by vendor
+export const updateVendorReturnStatus = async (req, res) => {
+  try {
+    const vendorId = req.user._id;
+    const safeBody = stripOperators({ ...req.body });
+    const status = safeBody.status ? asString(safeBody.status).toLowerCase() : '';
+    const reviewNote = safeBody.reviewNote ? asString(safeBody.reviewNote).trim() : '';
+
+    if (!VENDOR_RETURN_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid return status'
+      });
+    }
+
+    const order = await Order.findById(req.params.orderId)
+      .populate('items.product', 'name images')
+      .populate('returnRequests.items.product', 'name images');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    const vendorItemKeySet = new Set(
+      order.items
+        .filter((item) => item.vendor?.toString() === vendorId.toString())
+        .map((item) => buildProductVariantKey(item))
+    );
+
+    if (vendorItemKeySet.size === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to manage returns for this order'
+      });
+    }
+
+    const request = order.returnRequests.id(req.params.returnRequestId);
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Return request not found'
+      });
+    }
+
+    const hasVendorItems = (request.items || []).some((item) =>
+      vendorItemKeySet.has(buildProductVariantKey(item))
+    );
+
+    if (!hasVendorItems) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to manage this return request'
+      });
+    }
+
+    request.status = status;
+    request.reviewedAt = new Date();
+    request.reviewNote = reviewNote;
+
+    await order.save();
+
+    const refreshed = await Order.findById(order._id)
+      .populate('user', 'fullName email phone')
+      .populate('items.product', 'name images')
+      .populate('returnRequests.items.product', 'name images');
+
+    const refreshedRequest = refreshed?.returnRequests?.id(req.params.returnRequestId);
+
+    res.json({
+      success: true,
+      data: {
+        orderId: refreshed?._id,
+        orderNumber: refreshed?.orderNumber,
+        customer: refreshed?.user,
+        returnRequest: refreshedRequest,
+      },
     });
   } catch (error) {
     res.status(500).json({

@@ -21,6 +21,7 @@ import {
   Settings,
   ChevronDown,
   Star,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@/types';
@@ -54,6 +55,7 @@ const sellerNav: NavItem[] = [
   { to: '/products/new', label: 'Add Products', icon: PlusCircle, end: true },
   { to: '/products/manage', label: 'Manage Products', icon: Package, end: true },
   { to: '/seller/orders', label: 'Manage Orders', icon: ClipboardList, end: true },
+  { to: '/seller/returns', label: 'Manage Returns', icon: RotateCcw, end: true },
   { to: '/seller/tax', label: 'Manage Tax', icon: Receipt, end: true },
 ];
 

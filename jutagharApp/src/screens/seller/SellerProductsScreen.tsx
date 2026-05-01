@@ -182,10 +182,10 @@ export default function SellerProductsScreen({ onAddProduct, onEditProduct }: Se
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Manage Products</Text>
-        <TouchableOpacity style={styles.headerAddButton} onPress={onAddProduct}>
-          <Text style={styles.headerAddText}>+ Add</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.titleText}>Manage Products</Text>
+        <TouchableOpacity style={styles.inlineAddButton} onPress={onAddProduct}>
+          <Text style={styles.inlineAddText}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
@@ -247,18 +247,17 @@ export default function SellerProductsScreen({ onAddProduct, onEditProduct }: Se
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: {
-    backgroundColor: '#1a1a2e',
-    paddingTop: 50,
-    paddingBottom: 14,
+  titleRow: {
     paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  headerAddButton: { backgroundColor: '#3498db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  headerAddText: { color: '#fff', fontWeight: '700' },
+  titleText: { color: '#1a1a2e', fontSize: 18, fontWeight: '700' },
+  inlineAddButton: { backgroundColor: '#3498db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  inlineAddText: { color: '#fff', fontWeight: '700' },
   filtersWrap: { maxHeight: 56, backgroundColor: '#f8f9fa' },
   filtersRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   filterChip: {
