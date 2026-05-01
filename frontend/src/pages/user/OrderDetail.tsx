@@ -199,9 +199,6 @@ const OrderDetail: React.FC = () => {
           <span className={`badge text-sm px-3 py-1 rounded-full font-medium capitalize ${getStatusColor(order.status)}`}>
             {order.status}
           </span>
-          <span className={`badge text-sm px-3 py-1 rounded-full font-medium capitalize ${getStatusColor(order.paymentStatus)}`}>
-            {order.paymentStatus}
-          </span>
         </div>
       </div>
 
