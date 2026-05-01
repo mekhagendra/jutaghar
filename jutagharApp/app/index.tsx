@@ -60,10 +60,12 @@ export default function Index() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSearch, setSelectedSearch] = useState<string>('');
   const [selectedGender, setSelectedGender] = useState<string | null>(null);
   const [selectedSort, setSelectedSort] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
+  const [selectedCheckoutItemKeys, setSelectedCheckoutItemKeys] = useState<string[] | null>(null);
   const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
   const [profileResetToken, setProfileResetToken] = useState(0);
 
@@ -172,12 +174,13 @@ export default function Index() {
     navigateTo('cart');
   };
 
-  const handleViewProducts = (options?: { category?: string; gender?: string; sort?: string; brand?: string; vendor?: string }) => {
+  const handleViewProducts = (options?: { category?: string; gender?: string; sort?: string; brand?: string; vendor?: string; search?: string }) => {
     setSelectedCategory(options?.category || null);
     setSelectedGender(options?.gender || null);
     setSelectedSort(options?.sort || null);
     setSelectedBrand(options?.brand || null);
     setSelectedVendor(options?.vendor || null);
+    setSelectedSearch(options?.search || '');
     navigateTo('products');
   };
 
@@ -194,7 +197,8 @@ export default function Index() {
     navigateTo('order-detail');
   };
 
-  const handleViewCheckout = () => {
+  const handleViewCheckout = (selectedItemKeys?: string[]) => {
+    setSelectedCheckoutItemKeys(selectedItemKeys && selectedItemKeys.length > 0 ? selectedItemKeys : null);
     navigateTo('checkout');
   };
 
@@ -347,6 +351,7 @@ export default function Index() {
         <CheckoutScreen
           onBack={goBack}
           onOrderSuccess={(orderId) => handleViewOrder(orderId)}
+          selectedItemKeys={selectedCheckoutItemKeys || undefined}
         />
       );
     }
@@ -388,6 +393,7 @@ export default function Index() {
             initialSort={selectedSort}
             initialBrand={selectedBrand}
             initialVendor={selectedVendor}
+            initialSearch={selectedSearch}
           />
         );
       case 'outlets':

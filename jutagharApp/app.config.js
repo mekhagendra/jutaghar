@@ -4,9 +4,12 @@
 //   Create one in Google Cloud Console → Credentials → "iOS" type for bundle id
 //   `com.metabyte.jutaghar`. Its reversed client ID is the URL scheme used below.
 const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
-const googleIosUrlScheme = googleIosClientId
-  ? `com.googleusercontent.apps.${googleIosClientId.replace('.apps.googleusercontent.com', '')}`
-  : 'com.googleusercontent.apps.PLACEHOLDER';
+// The iOS URL scheme is the reversed iOS client ID. Not secret — it is embedded
+// in the final binary and visible in Info.plist. Hardcoded as fallback so EAS
+// config parsing doesn't fail when .env is not loaded by the fallback parser.
+const googleIosUrlScheme =
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ||
+  'com.googleusercontent.apps.624445426814-ctp7g7482rsu5ibrreo9vvf19qsr81se';
 
 /** @type {import('@expo/config').ExpoConfig} */
 module.exports = {
@@ -69,8 +72,10 @@ module.exports = {
 
     extra: {
       router: {},
+      // Set EXPO_PUBLIC_PLAY_INTEGRITY_PROJECT_NUMBER (Google Cloud project number) before
+      // building the Android production binary, otherwise Play Integrity attestation will fail.
       playIntegrity: {
-        cloudProjectNumber: '',
+        cloudProjectNumber: process.env.EXPO_PUBLIC_PLAY_INTEGRITY_PROJECT_NUMBER || '',
       },
       deviceAttestation: {
         backendVerificationEnabled: false,

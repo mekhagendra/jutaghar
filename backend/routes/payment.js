@@ -1,7 +1,7 @@
 import express from 'express';
 import { body } from 'express-validator';
 import * as paymentController from '../controllers/paymentController.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -15,7 +15,7 @@ const initiateOrderValidation = [
 ];
 
 // Tax estimate (for checkout preview)
-router.post('/tax-estimate', authenticate, paymentController.estimateTax);
+router.post('/tax-estimate', optionalAuth, paymentController.estimateTax);
 
 // Initiate order (create pending order before payment)
 router.post('/initiate', authenticate, initiateOrderValidation, paymentController.initiateOrder);

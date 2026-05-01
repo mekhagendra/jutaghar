@@ -70,12 +70,12 @@ export default function Featured({ products, onViewProduct }: FeaturedProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <View>
           <Text style={styles.title}>Featured</Text>
           <Text style={styles.subtitle}>Handpicked just for you</Text>
         </View>
-      </View>
+      </View> */}
       <FlatList
         ref={listRef}
         data={featuredItems}

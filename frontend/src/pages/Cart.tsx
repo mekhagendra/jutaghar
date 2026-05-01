@@ -14,9 +14,55 @@ const getCartItemKey = (item: { product: { _id: string }; selectedVariant?: { co
 };
 
 const Cart: React.FC = () => {
-  const { items, removeItem, updateQuantity, getTotalPrice, clearCart } = useCartStore();
+  const { items, removeItem, updateQuantity, clearCart } = useCartStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const [selectedItemKeys, setSelectedItemKeys] = React.useState<Set<string>>(
+    () => new Set(items.map(getCartItemKey))
+  );
+  const previousItemKeysRef = React.useRef<Set<string>>(new Set(items.map(getCartItemKey)));
+
+  React.useEffect(() => {
+    const currentKeys = items.map(getCartItemKey);
+    const previousItemKeys = previousItemKeysRef.current;
+
+    setSelectedItemKeys((prev) => {
+      const next = new Set<string>();
+      for (const key of currentKeys) {
+        const isNewItem = !previousItemKeys.has(key);
+        if (prev.has(key) || isNewItem) {
+          next.add(key);
+        }
+      }
+      return next;
+    });
+
+    previousItemKeysRef.current = new Set(currentKeys);
+  }, [items]);
+
+  const selectedItems = React.useMemo(
+    () => items.filter((item) => selectedItemKeys.has(getCartItemKey(item))),
+    [items, selectedItemKeys]
+  );
+
+  const allSelected = items.length > 0 && selectedItems.length === items.length;
+
+  const toggleItemSelection = (itemKey: string) => {
+    setSelectedItemKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemKey)) next.delete(itemKey);
+      else next.add(itemKey);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedItemKeys(new Set());
+      return;
+    }
+    setSelectedItemKeys(new Set(items.map(getCartItemKey)));
+  };
 
   const { data: deliverySettings } = useQuery({
     queryKey: ['delivery-settings'],
@@ -26,7 +72,12 @@ const Cart: React.FC = () => {
     },
   });
 
-  const subtotal = getTotalPrice();
+  const subtotal = selectedItems.reduce((total, item) => {
+    const price = item.product.onSale && item.product.salePrice
+      ? item.product.salePrice
+      : item.product.price;
+    return total + price * item.quantity;
+  }, 0);
   const deliveryFee = (() => {
     if (!deliverySettings) return 0;
     const { minDeliveryFee, deliveryFeeRate, freeDeliveryThreshold } = deliverySettings;
@@ -35,13 +86,13 @@ const Cart: React.FC = () => {
   })();
 
   const { data: taxData, isLoading: taxLoading } = useQuery({
-    queryKey: ['tax-estimate', items.map((i) => `${i.product._id}-${i.quantity}`).join(',')],
+    queryKey: ['tax-estimate', selectedItems.map((i) => `${getCartItemKey(i)}-${i.quantity}`).join(',')],
     queryFn: async () => {
       const res = await api.post<{
         success: boolean;
         data: { tax: number; taxDisplay: number; breakdown: { label: string; rate: number; amount: number }[] };
       }>('/api/payment/tax-estimate', {
-        items: items.map((i) => ({
+        items: selectedItems.map((i) => ({
           product: i.product._id,
           quantity: i.quantity,
           variant: i.selectedVariant,
@@ -49,7 +100,7 @@ const Cart: React.FC = () => {
       });
       return res.data.data;
     },
-    enabled: items.length > 0 && !!user,
+    enabled: selectedItems.length > 0 && !!user,
     retry: false,
   });
 
@@ -77,6 +128,19 @@ const Cart: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
 
+      <div className="mb-4 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+        <span className="text-gray-700">
+          {selectedItems.length} of {items.length} selected for checkout
+        </span>
+        <button
+          type="button"
+          onClick={toggleSelectAll}
+          className="font-medium text-primary-600 hover:text-primary-700"
+        >
+          {allSelected ? 'Unselect all' : 'Select all'}
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
@@ -90,7 +154,16 @@ const Cart: React.FC = () => {
               : undefined;
             
             return (
-              <div key={itemKey} className="card flex gap-4">
+              <div key={itemKey} className={`card flex gap-4 ${selectedItemKeys.has(itemKey) ? '' : 'opacity-70'}`}>
+                <div className="pt-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedItemKeys.has(itemKey)}
+                    onChange={() => toggleItemSelection(itemKey)}
+                    className="h-4 w-4"
+                    aria-label={`Select ${item.product.name} for checkout`}
+                  />
+                </div>
                 <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                   {(() => {
                     const src =
@@ -225,16 +298,15 @@ const Cart: React.FC = () => {
               </div>
             </div>
 
-            <div className="border-t pt-4 mb-6">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span className="text-primary-600">{formatCurrency(total)}</span>
-              </div>
+            <div className="flex justify-between text-lg font-bold">
+              <span>Total</span>
+              <span className="text-primary-600">{formatCurrency(total)}</span>
             </div>
 
             <button
-              onClick={() => navigate('/checkout')}
-              className="btn btn-primary w-full"
+              onClick={() => navigate('/checkout', { state: { selectedItemKeys: Array.from(selectedItemKeys) } })}
+              disabled={selectedItems.length === 0}
+              className="btn btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Proceed to Checkout
             </button>

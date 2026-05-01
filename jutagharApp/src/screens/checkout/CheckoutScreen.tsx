@@ -1,11 +1,11 @@
 import api from '@/api';
 import { getAuthState } from '@/features/auth';
-import { clearCart, getCartItems, getTotalPrice } from '@/features/checkout';
+import { getCartItems, removeFromCart, subscribeCart } from '@/features/checkout';
 import type { CartItem, DeliverySettings } from '@/types';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -20,14 +20,36 @@ import {
 interface CheckoutScreenProps {
   onBack: () => void;
   onOrderSuccess: (orderId: string) => void;
+  selectedItemKeys?: string[];
 }
 
-export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScreenProps) {
-  const [items, setItems] = useState<CartItem[]>([]);
+const getVariantKey = (variant?: CartItem['selectedVariant']) => {
+  if (!variant) return undefined;
+  return `${variant.color || ''}-${variant.size || ''}-${variant.sku || ''}`;
+};
+
+const getCartItemKey = (item: CartItem) => `${item.product._id}::${getVariantKey(item.selectedVariant) || 'default'}`;
+
+const resolveCheckoutItems = (incomingSelectedItemKeys?: string[]) => {
+  const allItems = getCartItems();
+  if (!incomingSelectedItemKeys || incomingSelectedItemKeys.length === 0) {
+    return allItems;
+  }
+  const selectedSet = new Set(incomingSelectedItemKeys);
+  return allItems.filter((item) => selectedSet.has(getCartItemKey(item)));
+};
+
+export default function CheckoutScreen({ onBack, onOrderSuccess, selectedItemKeys }: CheckoutScreenProps) {
+  const [items, setItems] = useState<CartItem[]>(() => resolveCheckoutItems(selectedItemKeys));
+  const [selectedCheckoutItemKeys, setSelectedCheckoutItemKeys] = useState<Set<string>>(
+    () => new Set(resolveCheckoutItems(selectedItemKeys).map(getCartItemKey))
+  );
+  const hasInitializedSelectionRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [deliverySettings, setDeliverySettings] = useState<DeliverySettings | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash_on_delivery');
   const [notes, setNotes] = useState('');
+  const [tax, setTax] = useState(0);
 
   const [address, setAddress] = useState({
     fullName: '',
@@ -39,11 +61,32 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
   });
 
   useEffect(() => {
-    setItems(getCartItems());
+    const sync = () => {
+      const checkoutItems = resolveCheckoutItems(selectedItemKeys);
+      setItems(checkoutItems);
+      setSelectedCheckoutItemKeys((prev) => {
+        const availableKeys = new Set(checkoutItems.map(getCartItemKey));
+        if (availableKeys.size === 0) {
+          // Cart not loaded yet — keep flag false so next sync can default to all-selected.
+          return new Set();
+        }
+        if (!hasInitializedSelectionRef.current) {
+          hasInitializedSelectionRef.current = true;
+          return new Set(availableKeys);
+        }
+        const next = new Set<string>();
+        prev.forEach((key) => {
+          if (availableKeys.has(key)) next.add(key);
+        });
+        return next;
+      });
+    };
+    sync();
     fetchDeliverySettings();
     loadUserInfo();
-    fetchTaxEstimate();
-  }, []);
+    const unsubscribe = subscribeCart(() => sync());
+    return unsubscribe;
+  }, [selectedItemKeys]);
 
   const loadUserInfo = () => {
     const auth = getAuthState();
@@ -65,12 +108,14 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
     }
   };
 
-  const fetchTaxEstimate = async () => {
-    const cartItems = getCartItems();
-    if (cartItems.length === 0) return;
+  const fetchTaxEstimate = async (targetItems: CartItem[]) => {
+    if (targetItems.length === 0) {
+      setTax(0);
+      return;
+    }
     try {
       const res = await api.post<{ tax: number }>('/api/payment/tax-estimate', {
-        items: cartItems.map(i => ({
+        items: targetItems.map(i => ({
           product: i.product._id,
           quantity: i.quantity,
           variant: i.selectedVariant,
@@ -82,14 +127,47 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
     }
   };
 
-  const subtotal = getTotalPrice();
+  const selectedItems = items.filter((item) => selectedCheckoutItemKeys.has(getCartItemKey(item)));
+  const selectedQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const allSelected = items.length > 0 && selectedItems.length === items.length;
+
+  useEffect(() => {
+    void fetchTaxEstimate(selectedItems);
+  }, [selectedCheckoutItemKeys, items]);
+
+  const toggleCheckoutItemSelection = (item: CartItem) => {
+    const key = getCartItemKey(item);
+    setSelectedCheckoutItemKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllCheckoutItems = () => {
+    if (allSelected) {
+      setSelectedCheckoutItemKeys(new Set());
+      return;
+    }
+    setSelectedCheckoutItemKeys(new Set(items.map(getCartItemKey)));
+  };
+
+  const subtotal = selectedItems.reduce((sum, item) => {
+    const price = item.product.onSale && item.product.salePrice
+      ? item.product.salePrice
+      : item.product.price;
+    return sum + price * item.quantity;
+  }, 0);
   const shippingFee = (() => {
     if (!deliverySettings) return 0;
     const { minDeliveryFee, deliveryFeeRate, freeDeliveryThreshold } = deliverySettings;
     if (freeDeliveryThreshold > 0 && subtotal >= freeDeliveryThreshold) return 0;
     return Math.max(minDeliveryFee, subtotal * deliveryFeeRate / 100);
   })();
-  const [tax, setTax] = useState(0);
   const total = subtotal + shippingFee + tax;
 
   const paymentOptions = [
@@ -99,6 +177,12 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
   ];
   const enabledPaymentMethods = ['cash_on_delivery'];
   const visiblePaymentOptions = paymentOptions.filter((opt) => enabledPaymentMethods.includes(opt.value));
+
+  const clearPurchasedItems = async () => {
+    for (const item of selectedItems) {
+      await removeFromCart(item.product._id, getVariantKey(item.selectedVariant));
+    }
+  };
 
   const handleEsewaPayment = async (paymentData: { orderId: string; amount: number; taxAmount: number; shippingCost: number; total: number }, orderId: string) => {
     try {
@@ -138,7 +222,7 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
         if (data) {
           const verifyRes = await api.get<{ success: boolean; data: { orderId: string } }>(`/api/payment/esewa/verify?data=${data}`);
           if (verifyRes.data?.success) {
-            await clearCart();
+            await clearPurchasedItems();
             Alert.alert('Payment Successful!', 'Your order has been confirmed.', [
               { text: 'View Order', onPress: () => onOrderSuccess(orderId) },
             ]);
@@ -194,7 +278,7 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
             amount: parseInt(amount || '0'),
           });
           if (verifyRes.data?.success) {
-            await clearCart();
+            await clearPurchasedItems();
             Alert.alert('Payment Successful!', 'Your order has been confirmed.', [
               { text: 'View Order', onPress: () => onOrderSuccess(orderId) },
             ]);
@@ -221,7 +305,7 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
       Alert.alert('Missing Info', 'Please fill in all required shipping details.');
       return;
     }
-    if (items.length === 0) {
+    if (selectedItems.length === 0) {
       Alert.alert('Empty Cart', 'Your cart is empty.');
       return;
     }
@@ -229,7 +313,7 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
     setIsLoading(true);
     try {
       const orderData = {
-        items: items.map(item => ({
+        items: selectedItems.map(item => ({
           product: item.product._id,
           quantity: item.quantity,
           variant: item.selectedVariant ? {
@@ -255,7 +339,7 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
       const paymentData = res.data?.paymentData;
 
       if (paymentMethod === 'cash_on_delivery') {
-        await clearCart();
+        await clearPurchasedItems();
         Alert.alert('Order Placed!', 'Your order has been placed successfully.', [
           { text: 'View Order', onPress: () => onOrderSuccess(orderId) },
         ]);
@@ -381,13 +465,27 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
         {/* Order Summary */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📋 Order Summary</Text>
+          <TouchableOpacity style={styles.selectAllRow} onPress={toggleSelectAllCheckoutItems}>
+            <View style={[styles.checkbox, allSelected && styles.checkboxActive]}>
+              {allSelected && <Text style={styles.checkboxTick}>✓</Text>}
+            </View>
+            <Text style={styles.selectAllText}>Select all items</Text>
+          </TouchableOpacity>
+
           {items.map((item, i) => {
             const price = item.product.onSale && item.product.salePrice
               ? item.product.salePrice
               : item.product.price;
+            const isSelected = selectedCheckoutItemKeys.has(getCartItemKey(item));
             return (
               <View key={i} style={styles.summaryItem}>
-                <View style={{ flex: 1 }}>
+                <TouchableOpacity
+                  style={[styles.checkbox, isSelected && styles.checkboxActive]}
+                  onPress={() => toggleCheckoutItemSelection(item)}
+                >
+                  {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
+                </TouchableOpacity>
+                <View style={{ flex: 1, opacity: isSelected ? 1 : 0.55 }}>
                   <Text style={styles.summaryItemName} numberOfLines={1}>{item.product.name}</Text>
                   {item.selectedVariant && (
                     <Text style={styles.summaryVariant}>
@@ -396,7 +494,9 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
                   )}
                   <Text style={styles.summaryQty}>Qty: {item.quantity}</Text>
                 </View>
-                <Text style={styles.summaryItemPrice}>Rs. {(price * item.quantity).toLocaleString()}</Text>
+                <Text style={[styles.summaryItemPrice, !isSelected && { opacity: 0.55 }]}>
+                  Rs. {(price * item.quantity).toLocaleString()}
+                </Text>
               </View>
             );
           })}
@@ -404,7 +504,7 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
           <View style={styles.divider} />
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
+            <Text style={styles.summaryLabel}>Subtotal ({selectedQuantity} items)</Text>
             <Text style={styles.summaryValue}>Rs. {subtotal.toLocaleString()}</Text>
           </View>
           <View style={styles.summaryRow}>
@@ -429,9 +529,9 @@ export default function CheckoutScreen({ onBack, onOrderSuccess }: CheckoutScree
       {/* Place Order Button */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={[styles.placeOrderButton, isLoading && styles.disabledButton]}
+          style={[styles.placeOrderButton, (isLoading || selectedItems.length === 0) && styles.disabledButton]}
           onPress={handlePlaceOrder}
-          disabled={isLoading}
+          disabled={isLoading || selectedItems.length === 0}
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
@@ -479,6 +579,38 @@ const styles = StyleSheet.create({
   paymentLabel: { fontSize: 15, color: '#333', flex: 1 },
   paymentLabelActive: { fontWeight: '700', color: '#3498db' },
   paymentCheck: { fontSize: 18, color: '#3498db', fontWeight: 'bold' },
+
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
+  },
+  selectAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3a4b5f',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#c7d1db',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxActive: {
+    backgroundColor: '#3498db',
+    borderColor: '#3498db',
+  },
+  checkboxTick: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
+    lineHeight: 14,
+  },
 
   summaryItem: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

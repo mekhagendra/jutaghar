@@ -180,13 +180,6 @@ const Navbar: React.FC = () => {
         const womenCats = (womenRes.data.data || []).filter((cat: Category) => cat.productCount && cat.productCount > 0);
         const kidsCats = (kidsRes.data.data || []).filter((cat: Category) => cat.productCount && cat.productCount > 0);
 
-        console.log('📦 Categories with inventory loaded:', {
-          all: allCats.length,
-          men: menCats.length,
-          women: womenCats.length,
-          kids: kidsCats.length
-        });
-
         setAllCategories(allCats);
         setMenCategories(menCats);
         setWomenCategories(womenCats);

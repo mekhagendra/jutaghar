@@ -45,14 +45,8 @@ const ManageInventory: React.FC = () => {
   const { data: productsData, isLoading, error } = useQuery({
     queryKey: ['vendor-products-inventory'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/api/products/vendor/my-products');
-        console.log('Products fetched:', response.data);
-        return response.data;
-      } catch (err) {
-        console.error('Error fetching products:', err);
-        throw err;
-      }
+      const response = await api.get('/api/products/vendor/my-products');
+      return response.data;
     }
   });
 
@@ -195,7 +189,6 @@ const ManageInventory: React.FC = () => {
   };
 
   const handleManageInventory = (product: Product) => {
-    console.log('Managing inventory for product:', product.name);
     setSelectedProduct(product);
     setShowInventoryView(true);
   };
@@ -208,9 +201,6 @@ const ManageInventory: React.FC = () => {
   };
 
   const products = productsData?.data?.products || [];
-  
-  console.log('Products data:', productsData);
-  console.log('Products array:', products);
 
   if (isLoading) {
     return (

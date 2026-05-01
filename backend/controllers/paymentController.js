@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import axios from 'axios';
+import { validationResult } from 'express-validator';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import mongoose from 'mongoose';
@@ -207,26 +208,62 @@ const parseEsewaWebhookPayload = (body) => {
 
 // Initiate order (create pending order before payment)
 export const initiateOrder = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  let session = null;
+  let hasTransaction = false;
 
   try {
+    session = await mongoose.startSession();
+    try {
+      session.startTransaction();
+      hasTransaction = true;
+    } catch (txError) {
+      logger.warn({ err: txError }, 'Mongo transactions unavailable; continuing initiateOrder without transaction');
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      if (hasTransaction) await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid checkout payload',
+        errors: errors.array(),
+      });
+    }
+
     const { items, paymentMethod, shippingAddress, notes } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      if (hasTransaction) await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'At least one item is required',
+      });
+    }
 
     // Validate and process items
     const orderItems = [];
     let subtotal = 0;
 
     for (const item of items) {
-      const product = await Product.findById(item.product)
-        .populate('vendor', 'role')
-        .session(session);
+      let productQuery = Product.findById(item.product).populate('vendor', 'role');
+      if (hasTransaction) {
+        productQuery = productQuery.session(session);
+      }
+      const product = await productQuery;
       
       if (!product || product.status !== 'active') {
-        await session.abortTransaction();
+        if (hasTransaction) await session.abortTransaction();
         return res.status(400).json({
           success: false,
           message: `Product not available`
+        });
+      }
+
+      if (!product.vendor) {
+        if (hasTransaction) await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Product vendor is missing. Please contact support.',
         });
       }
 
@@ -241,7 +278,7 @@ export const initiateOrder = async (req, res) => {
         );
 
         if (!selectedVariant) {
-          await session.abortTransaction();
+          if (hasTransaction) await session.abortTransaction();
           return res.status(400).json({
             success: false,
             message: `Selected variant not available`
@@ -252,7 +289,7 @@ export const initiateOrder = async (req, res) => {
       }
 
       if (availableStock < item.quantity) {
-        await session.abortTransaction();
+        if (hasTransaction) await session.abortTransaction();
         return res.status(400).json({
           success: false,
           message: `Insufficient stock`
@@ -267,7 +304,7 @@ export const initiateOrder = async (req, res) => {
         product: product._id,
         quantity: item.quantity,
         price: itemPrice,
-        vendor: product.vendor._id || product.vendor,
+        vendor: product.vendor?._id || product.vendor,
         variant: item.variant ? {
           color: item.variant.color,
           size: item.variant.size,
@@ -298,8 +335,10 @@ export const initiateOrder = async (req, res) => {
       notes
     });
 
-    await order.save({ session });
-    await session.commitTransaction();
+    await order.save(hasTransaction ? { session } : undefined);
+    if (hasTransaction) {
+      await session.commitTransaction();
+    }
 
     await writeAudit({
       req,
@@ -327,13 +366,21 @@ export const initiateOrder = async (req, res) => {
       }
     });
   } catch (error) {
-    await session.abortTransaction();
+    logger.error({ err: error, body: req.body, userId: req.user?._id }, 'Failed to initiate order');
+    if (hasTransaction && session?.inTransaction?.()) {
+      await session.abortTransaction();
+    }
+    const isDev = process.env.NODE_ENV !== 'production';
     res.status(500).json({
       success: false,
-      message: 'Internal error', requestId: req.id
+      message: isDev ? (error?.message || 'Internal error') : 'Internal error',
+      requestId: req.id,
+      ...(isDev && error?.name ? { errorName: error.name } : {}),
     });
   } finally {
-    session.endSession();
+    if (session) {
+      session.endSession();
+    }
   }
 };
 

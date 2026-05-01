@@ -38,7 +38,16 @@ deliverySettingsSchema.statics.calculateShipping = async function (subtotal) {
 deliverySettingsSchema.statics.getSettings = async function () {
   let doc = await this.findOne({ singleton: 'default' });
   if (!doc) {
-    doc = await this.create({ singleton: 'default' });
+    try {
+      doc = await this.create({ singleton: 'default' });
+    } catch (error) {
+      // Another request may have created the singleton concurrently.
+      if (error?.code === 11000) {
+        doc = await this.findOne({ singleton: 'default' });
+      } else {
+        throw error;
+      }
+    }
   }
   return doc;
 };

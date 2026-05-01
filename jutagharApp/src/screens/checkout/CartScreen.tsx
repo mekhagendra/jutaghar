@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
     Image,
@@ -13,8 +13,6 @@ import Header from '@/shared/components/Header';
 import { API_BASE_URL } from '@/api';
 import {
     getCartItems,
-    getTotalItems,
-    getTotalPrice,
     removeFromCart,
     subscribeCart,
     updateQuantity,
@@ -23,12 +21,14 @@ import type { CartItem } from '@/types';
 
 interface CartScreenProps {
   onBack?: () => void;
-  onCheckout?: () => void;
+  onCheckout?: (selectedItemKeys: string[]) => void;
   onBrowseProducts?: () => void;
 }
 
 export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: CartScreenProps) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [selectedItemKeys, setSelectedItemKeys] = useState<Set<string>>(new Set());
+  const hasInitializedSelectionRef = useRef(false);
 
   useEffect(() => {
     setItems(getCartItems());
@@ -37,6 +37,26 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const availableKeys = new Set(items.map(getCartItemKey));
+    if (availableKeys.size === 0) {
+      // Cart not loaded yet; don't latch the "initialized" flag with an empty selection.
+      setSelectedItemKeys(new Set());
+      return;
+    }
+    setSelectedItemKeys((prev) => {
+      if (!hasInitializedSelectionRef.current) {
+        hasInitializedSelectionRef.current = true;
+        return new Set(availableKeys);
+      }
+      const next = new Set<string>();
+      prev.forEach((key) => {
+        if (availableKeys.has(key)) next.add(key);
+      });
+      return next;
+    });
+  }, [items]);
 
   const extractImagePath = (value: unknown): string | null => {
     if (!value) return null;
@@ -87,6 +107,8 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
     return `${variant.color || ''}-${variant.size || ''}-${variant.sku || ''}`;
   };
 
+  const getCartItemKey = (item: CartItem) => `${item.product._id}::${getVariantKey(item.selectedVariant) || 'default'}`;
+
   const handleRemoveItem = (item: CartItem) => {
     Alert.alert('Remove Item', `Remove ${item.product.name} from cart?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -99,15 +121,42 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
   };
 
   const handleCheckout = () => {
+    if (selectedItemKeys.size === 0) {
+      Alert.alert('No Items Selected', 'Please select at least one item to checkout.');
+      return;
+    }
     if (onCheckout) {
-      onCheckout();
+      onCheckout(Array.from(selectedItemKeys));
     } else {
       Alert.alert('Checkout', 'Checkout functionality coming soon!');
     }
   };
 
-  const totalItems = getTotalItems();
-  const totalPrice = getTotalPrice();
+  const selectedItems = items.filter((item) => selectedItemKeys.has(getCartItemKey(item)));
+  const selectedCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = selectedItems.reduce((sum, item) => sum + getItemPrice(item) * item.quantity, 0);
+  const allSelected = items.length > 0 && selectedItems.length === items.length;
+
+  const toggleItemSelection = (item: CartItem) => {
+    const key = getCartItemKey(item);
+    setSelectedItemKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedItemKeys(new Set());
+      return;
+    }
+    setSelectedItemKeys(new Set(items.map(getCartItemKey)));
+  };
 
   return (
     <View style={styles.container}>
@@ -133,9 +182,18 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
                 getImageUrl(item.product.mainImage) ||
                 getImageUrl(item.product.images?.[0]);
               const price = getItemPrice(item);
+              const isSelected = selectedItemKeys.has(getCartItemKey(item));
 
               return (
                 <View key={`${item.product._id}-${index}`} style={styles.cartItem}>
+                  <TouchableOpacity
+                    style={[styles.checkbox, isSelected && styles.checkboxActive]}
+                    onPress={() => toggleItemSelection(item)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
+                  </TouchableOpacity>
+
                   {/* Product Image */}
                   <View style={styles.itemImage}>
                     {imageUrl ? (
@@ -201,11 +259,26 @@ export default function CartScreen({ onBack, onCheckout, onBrowseProducts }: Car
 
           {/* Bottom Summary */}
           <View style={styles.bottomBar}>
+            <TouchableOpacity
+              style={styles.selectAllRow}
+              onPress={toggleSelectAll}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <View style={[styles.checkbox, allSelected && styles.checkboxActive]}>
+                {allSelected && <Text style={styles.checkboxTick}>✓</Text>}
+              </View>
+              <Text style={styles.selectAllText}>Select all items</Text>
+            </TouchableOpacity>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal ({totalItems} items)</Text>
+              <Text style={styles.summaryLabel}>Subtotal ({selectedCount} items)</Text>
               <Text style={styles.summaryValue}>Rs. {totalPrice.toLocaleString()}</Text>
             </View>
-            <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <TouchableOpacity
+              style={[styles.checkoutButton, selectedItems.length === 0 && styles.disabledButton]}
+              onPress={handleCheckout}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              disabled={selectedItems.length === 0}
+            >
               <Text style={styles.checkoutText}>Proceed to Checkout</Text>
             </TouchableOpacity>
           </View>
@@ -260,6 +333,7 @@ const styles = StyleSheet.create({
   },
   cartItem: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 12,
@@ -293,6 +367,28 @@ const styles = StyleSheet.create({
   itemInfo: {
     flex: 1,
     marginLeft: 12,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#c7d1db',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 2,
+    backgroundColor: '#fff',
+  },
+  checkboxActive: {
+    backgroundColor: '#3498db',
+    borderColor: '#3498db',
+  },
+  checkboxTick: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
+    lineHeight: 14,
   },
   itemName: {
     fontSize: 15,
@@ -368,6 +464,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  selectAllText: {
+    fontSize: 14,
+    color: '#3a4b5f',
+    fontWeight: '600',
+  },
   summaryLabel: {
     fontSize: 16,
     color: '#7f8c8d',
@@ -382,6 +489,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#bdc3c7',
   },
   checkoutText: {
     color: '#fff',

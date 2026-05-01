@@ -25,7 +25,7 @@ interface HomeScreenProps {
   userData?: any;
   onViewProduct?: (product: Product) => void;
   onViewCart?: () => void;
-  onViewProducts?: (options?: { category?: string; gender?: string; sort?: string; brand?: string; vendor?: string }) => void;
+  onViewProducts?: (options?: { category?: string; gender?: string; sort?: string; brand?: string; vendor?: string; search?: string }) => void;
   onViewOutlets?: () => void;
   onViewOrders?: () => void;
   onViewProfile?: () => void;
@@ -98,7 +98,10 @@ export default function HomeScreen({ onViewProduct, onViewProducts, onViewOutlet
       <StatusBar style="light" />
 
       {/* Header */}
-      <Header onSearch={(text) => onViewProducts?.({ category: text })} />
+      <Header
+        onSearch={(text) => onViewProducts?.({ search: text })}
+        onSelectSuggestion={(product) => onViewProduct?.(product)}
+      />
 
       {/* Navbar */}
       <Navbar items={[

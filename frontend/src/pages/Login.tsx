@@ -408,7 +408,6 @@ const Login: React.FC = () => {
               setError('Google sign-in failed. Please try again.');
             }}
             size="large"
-            width="100%"
             text="signin_with"
           />
         </div>

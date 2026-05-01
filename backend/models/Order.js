@@ -100,11 +100,11 @@ const orderSchema = new mongoose.Schema({
   cancelledAt: Date,
   gatewayTransactionId: {
     type: String,
-    default: null
+    default: undefined
   },
   gatewayPidx: {
     type: String,
-    default: null
+    default: undefined
   }
 }, {
   timestamps: true
@@ -128,7 +128,15 @@ orderSchema.index({ user: 1, createdAt: -1 });
 // Note: orderNumber already has unique index from schema definition
 orderSchema.index({ status: 1 });
 orderSchema.index({ 'items.vendor': 1 });
-orderSchema.index({ gatewayTransactionId: 1 }, { unique: true, sparse: true });
+orderSchema.index(
+  { gatewayTransactionId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      gatewayTransactionId: { $type: 'string' },
+    },
+  }
+);
 
 const Order = mongoose.model('Order', orderSchema);
 

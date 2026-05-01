@@ -62,12 +62,6 @@ const Products: React.FC = () => {
   const selectedSizes = size.split(',').filter(Boolean);
   const selectedColors = color.split(',').filter(Boolean);
 
-  // Debug logging on URL change
-  useEffect(() => {
-    console.log('🛍️ Products page - URL params changed');
-    console.log('📍 Params:', { gender, category, brand, search, sort });
-  }, [gender, category, brand, search, sort]);
-
   // Helper function to update URL params
   const updateSearchParams = (updates: Record<string, string | string[] | null>) => {
     const params = new URLSearchParams(searchParams);
@@ -90,7 +84,6 @@ const Products: React.FC = () => {
     queryKey: ['categories', 'active'],
     queryFn: async () => {
       const response = await api.get('/api/catalog/categories?status=active');
-      console.log('📦 Categories response:', response.data);
       return response.data;
     },
   });
@@ -100,7 +93,6 @@ const Products: React.FC = () => {
     queryKey: ['brands', 'withInventory'],
     queryFn: async () => {
       const response = await api.get('/api/catalog/brands?withInventory=true');
-      console.log('📦 Brands response:', response.data);
       return response.data;
     },
   });
@@ -110,7 +102,6 @@ const Products: React.FC = () => {
     queryKey: ['vendors', 'active'],
     queryFn: async () => {
       const response = await api.get('/api/outlets?isApproved=true');
-      console.log('📦 Vendors response:', response.data);
       return response.data;
     },
   });
@@ -170,20 +161,12 @@ const Products: React.FC = () => {
       if (sort) params.append('sort', sort);
       if (inStock) params.append('inStock', 'true');
       
-      console.log('🔄 Fetching products with params:', params.toString());
       const response = await api.get(`/api/products?${params.toString()}`);
-      console.log('✅ Products fetched:', response.data.data?.products?.length || 0, 'items');
       return response.data.data;
     },
   });
 
   const products = data?.products || [];
-
-  console.log('📦 Products data:', { 
-    isLoading, 
-    hasError: !!error, 
-    productsCount: products.length 
-  });
 
   // Filter change handlers
   const handleFilterChange = (

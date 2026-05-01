@@ -388,6 +388,39 @@ const PORT = process.env.PORT || 8000;
 
 const startServer = async () => {
   await connectWithRetry();
+
+  // Migrate legacy orders.gatewayTransactionId unique sparse index to a partial unique index.
+  // The old index treats null as a real value and can block inserting multiple unpaid orders.
+  const ordersCollection = mongoose.connection.collection('orders');
+  const indexName = 'gatewayTransactionId_1';
+  try {
+    const indexes = await ordersCollection.indexes();
+    const oldGatewayIndex = indexes.find((idx) => idx.name === indexName);
+
+    if (oldGatewayIndex?.unique && oldGatewayIndex?.sparse) {
+      await ordersCollection.dropIndex(indexName);
+    }
+
+    const hasPartialGatewayIndex = indexes.some(
+      (idx) => idx.name === indexName && idx.partialFilterExpression
+    );
+
+    if (!hasPartialGatewayIndex) {
+      await ordersCollection.createIndex(
+        { gatewayTransactionId: 1 },
+        {
+          name: indexName,
+          unique: true,
+          partialFilterExpression: {
+            gatewayTransactionId: { $type: 'string' },
+          },
+        }
+      );
+    }
+  } catch (indexError) {
+    logger.warn({ err: indexError }, 'Orders gatewayTransactionId index migration skipped');
+  }
+
   if (process.env.NODE_ENV !== 'test') {
     startPaymentReconciliationCron();
   }
